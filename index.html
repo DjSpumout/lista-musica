@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lista Música IA - Plazos en Vivo</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background-color: #0f172a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
+        .day-cell { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 0.5rem; font-size: 0.875rem; }
+        .day-today { border: 2px solid #a855f7; font-weight: bold; background-color: rgba(168, 85, 247, 0.15); }
+        .day-in-range { background-color: rgba(16, 185, 129, 0.25); color: #6ee7b7; font-weight: 600; border: 1px solid rgba(16, 185, 129, 0.4); }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+
+    <!-- Modal de Confirmación -->
+    <div id="confirmModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div class="bg-slate-800 rounded-xl max-w-md w-full p-6 border border-slate-700 shadow-2xl">
+            <h3 class="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                <i class="fa-solid fa-triangle-exclamation text-amber-400"></i> Confirmar Acción
+            </h3>
+            <p id="modalMessage" class="text-slate-300 mb-6">¿Desea cancelar este plazo?</p>
+            <div class="flex justify-end gap-3">
+                <button onclick="closeConfirmModal(false)" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition font-medium">No</button>
+                <button onclick="closeConfirmModal(true)" class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition font-medium">Sí, Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-4xl mx-auto space-y-6">
+
+        <header class="text-center py-6 border-b border-slate-800">
+            <h1 class="text-3xl md:text-4xl font-extrabold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
+                Lista Música de IA para todo el Mundo
+            </h1>
+            <p class="text-slate-400 mt-2">Seguimiento de Plazos en Directo (20 Días)</p>
+        </header>
+
+        <!-- Calendario Fijo -->
+        <section class="bg-slate-800/80 p-6 rounded-xl border border-slate-700 shadow-lg">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+                    <i class="fa-regular fa-calendar-days text-purple-400"></i>
+                    <span id="calendarMonthYear">Cargando Mes...</span>
+                </h2>
+                <div class="flex gap-3 text-xs">
+                    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded border border-purple-500 bg-purple-500/20 inline-block"></span> Hoy</span>
+                    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-emerald-500/30 border border-emerald-500 inline-block"></span> Plazo 20 Días</span>
+                </div>
+            </div>
+            <div class="grid grid-cols-7 gap-1 text-center font-semibold text-xs text-slate-400 mb-2">
+                <div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div><div>Dom</div>
+            </div>
+            <div id="calendarGrid" class="grid grid-cols-7 gap-1"></div>
+        </section>
+
+        <!-- Formulario de Registro -->
+        <section class="bg-slate-800/80 p-6 rounded-xl border border-slate-700 shadow-lg">
+            <h2 class="text-xl font-bold text-slate-100 mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-user-plus text-purple-400"></i> Añadir Nueva Solicitud
+            </h2>
+            <form id="registroForm" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Nombre Completo</label>
+                    <input type="text" id="nombre" required placeholder="Ej. Carlos Pérez" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Perfil (TikTok / Red Social)</label>
+                    <input type="text" id="perfil" required placeholder="Ej. @carlosperez" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Nombre Artístico</label>
+                    <input type="text" id="nombre2" placeholder="Ej. DJ Carlix" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Nombre Canción / Tema</label>
+                    <input type="text" id="nombre3" placeholder="Ej. Tema Verano" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Fecha Inicio</label>
+                    <input type="date" id="fechaInicio" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Plazo (Días)</label>
+                    <input type="number" id="diasPlazo" value="20" min="1" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500">
+                </div>
+                <div class="md:col-span-2 lg:col-span-3 flex justify-end mt-2">
+                    <button type="submit" class="w-full md:w-auto px-6 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-lg shadow-md transition">
+                        <i class="fa-solid fa-plus mr-1"></i> Guardar Solicitud
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <!-- Tabla de Registros -->
+        <section class="bg-slate-800/80 p-6 rounded-xl border border-slate-700 shadow-lg">
+            <h2 class="text-xl font-bold text-slate-100 mb-4 flex items-center justify-between">
+                <span><i class="fa-solid fa-list-check text-pink-400"></i> Registro de Plazos</span>
+                <span id="contadorRegistros" class="text-sm font-normal text-slate-400 bg-slate-900 px-3 py-1 rounded-full border border-slate-700">0 Registros</span>
+            </h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm text-slate-300">
+                    <thead class="bg-slate-900/60 uppercase text-xs text-slate-400 border-b border-slate-700">
+                        <tr>
+                            <th class="py-3 px-4">Participante</th>
+                            <th class="py-3 px-4">Detalles</th>
+                            <th class="py-3 px-4">Plazo (20 Días)</th>
+                            <th class="py-3 px-4 text-center">Estado</th>
+                            <th class="py-3 px-4 text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaCuerpo" class="divide-y divide-slate-700/50"></tbody>
+                </table>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- Módulos de Firebase SDK v10 -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // CONFIGURACIÓN DE TU FIREBASE REAL (lista-musica-ia)
+        const firebaseConfig = {
+            apiKey: "AIzaSyBVEWu7BbvKF-xlCwTU8RxMlvRSA54BoqU",
+            authDomain: "lista-musica-ia.firebaseapp.com",
+            projectId: "lista-musica-ia",
+            storageBucket: "lista-musica-ia.firebasestorage.app",
+            messagingSenderId: "60825175129",
+            appId: "1:60825175129:web:ccd8dc08480074ca755d48"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const registrosRef = collection(db, "solicitudes_musica");
+
+        let registros = [];
+        let selectedRegistroId = null;
+        let pendingAction = null;
+
+        document.getElementById('fechaInicio').valueAsDate = new Date();
+
+        // Escuchador en tiempo real de Firestore
+        onSnapshot(registrosRef, (snapshot) => {
+            registros = [];
+            snapshot.forEach((doc) => {
+                registros.push({ id: doc.id, ...doc.data() });
+            });
+            if (registros.length > 0 && !selectedRegistroId) {
+                selectedRegistroId = registros[0].id;
+            }
+            renderizarTabla();
+            renderizarCalendario();
+        });
+
+        // Formulario submit
+        document.getElementById('registroForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const nombre = document.getElementById('nombre').value;
+            const perfil = document.getElementById('perfil').value;
+            const nombre2 = document.getElementById('nombre2').value;
+            const nombre3 = document.getElementById('nombre3').value;
+            const fechaInicio = document.getElementById('fechaInicio').value;
+            const dias = parseInt(document.getElementById('diasPlazo').value);
+
+            const fIn = new Date(fechaInicio);
+            const fFin = new Date(fIn);
+            fFin.setDate(fFin.getDate() + dias);
+
+            await addDoc(registrosRef, {
+                nombre, perfil, nombre2, nombre3,
+                fechaInicio: fIn.toISOString().split('T')[0],
+                fechaFin: fFin.toISOString().split('T')[0],
+                dias,
+                forzadoCerrado: false,
+                creado: new Date().getTime()
+            });
+
+            e.target.reset();
+            document.getElementById('fechaInicio').valueAsDate = new Date();
+            document.getElementById('diasPlazo').value = 20;
+        });
+
+        function estaAbierto(reg) {
+            if (reg.forzadoCerrado) return false;
+            const hoy = new Date().setHours(0,0,0,0);
+            const fin = new Date(reg.fechaFin).setHours(0,0,0,0);
+            return hoy <= fin;
+        }
+
+        function renderizarTabla() {
+            const tbody = document.getElementById('tablaCuerpo');
+            tbody.innerHTML = '';
+            document.getElementById('contadorRegistros').textContent = `${registros.length} Registros`;
+
+            if (registros.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-slate-500">No hay registros activos en vivo.</td></tr>`;
+                return;
+            }
+
+            registros.forEach((reg) => {
+                const abierto = estaAbierto(reg);
+                const isSelected = reg.id === selectedRegistroId;
+                const tr = document.createElement('tr');
+                tr.className = `hover:bg-slate-700/30 transition cursor-pointer ${isSelected ? 'bg-slate-700/40 border-l-4 border-purple-500' : ''}`;
+                tr.onclick = () => { selectedRegistroId = reg.id; renderizarTabla(); renderizarCalendario(); };
+
+                tr.innerHTML = `
+                    <td class="py-3 px-4">
+                        <div class="font-bold text-white">${reg.nombre}</div>
+                        <div class="text-xs text-purple-400">@${reg.perfil.replace('@','')}</div>
+                    </td>
+                    <td class="py-3 px-4 text-xs">
+                        <div><span class="text-slate-500">Artístico:</span> ${reg.nombre2 || '-'}</div>
+                        <div><span class="text-slate-500">Canción:</span> ${reg.nombre3 || '-'}</div>
+                    </td>
+                    <td class="py-3 px-4 text-xs">
+                        <div><i class="fa-regular fa-calendar-check text-green-400"></i> ${reg.fechaInicio}</div>
+                        <div class="font-semibold text-amber-400"><i class="fa-regular fa-calendar-xmark"></i> ${reg.fechaFin} (${reg.dias}d)</div>
+                    </td>
+                    <td class="py-3 px-4 text-center">
+                        ${abierto ? `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-600 text-white">Abierto</span>` : `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-red-600 text-white">Cerrado</span>`}
+                    </td>
+                    <td class="py-3 px-4 text-center space-x-1" onclick="event.stopPropagation()">
+                        ${abierto ? `<button data-id="${reg.id}" data-action="cerrar" class="btn-state px-2 py-1 bg-red-600 hover:bg-red-500 text-white text-xs rounded">Cerrar</button>` : `<button data-id="${reg.id}" data-action="abrir" class="btn-state px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded">Reabrir</button>`}
+                        <button data-id="${reg.id}" class="btn-delete px-2 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs rounded"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Handlers para botones
+            document.querySelectorAll('.btn-state').forEach(btn => {
+                btn.onclick = (e) => {
+                    const id = e.target.dataset.id;
+                    const action = e.target.dataset.action;
+                    solicitarCambioEstado(id, action);
+                };
+            });
+            document.querySelectorAll('.btn-delete').forEach(btn => {
+                btn.onclick = (e) => solicitarEliminacion(e.target.closest('button').dataset.id);
+            });
+        }
+
+        function renderizarCalendario() {
+            const grid = document.getElementById('calendarGrid');
+            grid.innerHTML = '';
+            const hoy = new Date();
+            const año = hoy.getFullYear();
+            const mes = hoy.getMonth();
+
+            const nombresMeses = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+            document.getElementById('calendarMonthYear').textContent = `${nombresMeses[mes]} ${año}`;
+
+            const primerDiaMes = new Date(año, mes, 1);
+            const ultimoDiaMes = new Date(año, mes + 1, 0);
+
+            let diaSemanaInicio = primerDiaMes.getDay() - 1;
+            if (diaSemanaInicio === -1) diaSemanaInicio = 6;
+
+            for (let i = 0; i < diaSemanaInicio; i++) {
+                const empty = document.createElement('div');
+                empty.className = 'day-cell text-slate-700 opacity-20';
+                grid.appendChild(empty);
+            }
+
+            let regSel = registros.find(r => r.id === selectedRegistroId);
+
+            for (let d = 1; d <= ultimoDiaMes.getDate(); d++) {
+                const fechaCelda = new Date(año, mes, d);
+                fechaCelda.setHours(0,0,0,0);
+                const cell = document.createElement('div');
+                cell.className = 'day-cell bg-slate-900/60 border border-slate-700/50';
+
+                const esHoy = fechaCelda.getTime() === new Date().setHours(0,0,0,0);
+                if (esHoy) cell.classList.add('day-today');
+
+                if (regSel) {
+                    const fIn = new Date(regSel.fechaInicio).setHours(0,0,0,0);
+                    const fFin = new Date(regSel.fechaFin).setHours(0,0,0,0);
+                    if (fechaCelda.getTime() >= fIn && fechaCelda.getTime() <= fFin) {
+                        cell.classList.add('day-in-range');
+                    }
+                }
+
+                cell.innerHTML = `<span>${d}</span>${esHoy ? '<span class="text-[9px] text-purple-400 font-bold">HOY</span>' : ''}`;
+                grid.appendChild(cell);
+            }
+        }
+
+        window.solicitarCambioEstado = (id, accion) => {
+            const reg = registros.find(r => r.id === id);
+            const msg = accion === 'cerrar' ? `¿Desea cancelar el plazo de "${reg.nombre}"?` : `¿Desea reabrir el plazo de "${reg.nombre}"?`;
+            abrirConfirmModal(msg, async () => {
+                await updateDoc(doc(db, "solicitudes_musica", id), { forzadoCerrado: (accion === 'cerrar') });
+            });
+        };
+
+        window.solicitarEliminacion = (id) => {
+            const reg = registros.find(r => r.id === id);
+            abrirConfirmModal(`¿Desea eliminar la solicitud de "${reg.nombre}"?`, async () => {
+                await deleteDoc(doc(db, "solicitudes_musica", id));
+            });
+        };
+
+        function abrirConfirmModal(msg, fn) {
+            document.getElementById('modalMessage').textContent = msg;
+            pendingAction = fn;
+            document.getElementById('confirmModal').classList.remove('hidden');
+        }
+
+        window.closeConfirmModal = (confirmado) => {
+            document.getElementById('confirmModal').classList.add('hidden');
+            if (confirmado && pendingAction) pendingAction();
+            pendingAction = null;
+        };
+
+        renderizarCalendario();
+    </script>
+</body>
+</html>
