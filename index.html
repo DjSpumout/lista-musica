@@ -3,324 +3,475 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lista Música IA - Plazos en Vivo</title>
-    <!-- Tailwind CSS -->
+    <title>Lista Música de IA para todo el Mundo</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        body { background-color: #0f172a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
-        .day-cell { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 0.5rem; font-size: 0.875rem; }
-        .day-today { border: 2px solid #a855f7; font-weight: bold; background-color: rgba(168, 85, 247, 0.15); }
-        .day-in-range { background-color: rgba(16, 185, 129, 0.25); color: #6ee7b7; font-weight: 600; border: 1px solid rgba(16, 185, 129, 0.4); }
-    </style>
-</head>
-<body class="min-h-screen p-4 md:p-8">
-
-    <!-- Modal de Confirmación -->
-    <div id="confirmModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div class="bg-slate-800 rounded-xl max-w-md w-full p-6 border border-slate-700 shadow-2xl">
-            <h3 class="text-xl font-bold text-white mb-2 flex items-center gap-2">
-                <i class="fa-solid fa-triangle-exclamation text-amber-400"></i> Confirmar Acción
-            </h3>
-            <p id="modalMessage" class="text-slate-300 mb-6">¿Desea cancelar este plazo?</p>
-            <div class="flex justify-end gap-3">
-                <button onclick="closeConfirmModal(false)" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition font-medium">No</button>
-                <button onclick="closeConfirmModal(true)" class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition font-medium">Sí, Confirmar</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="max-w-4xl mx-auto space-y-6">
-
-        <header class="text-center py-6 border-b border-slate-800">
-            <h1 class="text-3xl md:text-4xl font-extrabold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
-                Lista Música de IA para todo el Mundo
-            </h1>
-            <p class="text-slate-400 mt-2">Seguimiento de Plazos en Directo (20 Días)</p>
-        </header>
-
-        <!-- Calendario Fijo -->
-        <section class="bg-slate-800/80 p-6 rounded-xl border border-slate-700 shadow-lg">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
-                    <i class="fa-regular fa-calendar-days text-purple-400"></i>
-                    <span id="calendarMonthYear">Cargando Mes...</span>
-                </h2>
-                <div class="flex gap-3 text-xs">
-                    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded border border-purple-500 bg-purple-500/20 inline-block"></span> Hoy</span>
-                    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-emerald-500/30 border border-emerald-500 inline-block"></span> Plazo 20 Días</span>
-                </div>
-            </div>
-            <div class="grid grid-cols-7 gap-1 text-center font-semibold text-xs text-slate-400 mb-2">
-                <div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div><div>Dom</div>
-            </div>
-            <div id="calendarGrid" class="grid grid-cols-7 gap-1"></div>
-        </section>
-
-        <!-- Formulario de Registro -->
-        <section class="bg-slate-800/80 p-6 rounded-xl border border-slate-700 shadow-lg">
-            <h2 class="text-xl font-bold text-slate-100 mb-4 flex items-center gap-2">
-                <i class="fa-solid fa-user-plus text-purple-400"></i> Añadir Nueva Solicitud
-            </h2>
-            <form id="registroForm" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">Nombre Completo</label>
-                    <input type="text" id="nombre" required placeholder="Ej. Carlos Pérez" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">Perfil (TikTok / Red Social)</label>
-                    <input type="text" id="perfil" required placeholder="Ej. @carlosperez" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">Nombre Artístico</label>
-                    <input type="text" id="nombre2" placeholder="Ej. DJ Carlix" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">Nombre Canción / Tema</label>
-                    <input type="text" id="nombre3" placeholder="Ej. Tema Verano" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">Fecha Inicio</label>
-                    <input type="date" id="fechaInicio" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">Plazo (Días)</label>
-                    <input type="number" id="diasPlazo" value="20" min="1" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500">
-                </div>
-                <div class="md:col-span-2 lg:col-span-3 flex justify-end mt-2">
-                    <button type="submit" class="w-full md:w-auto px-6 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-lg shadow-md transition">
-                        <i class="fa-solid fa-plus mr-1"></i> Guardar Solicitud
-                    </button>
-                </div>
-            </form>
-        </section>
-
-        <!-- Tabla de Registros -->
-        <section class="bg-slate-800/80 p-6 rounded-xl border border-slate-700 shadow-lg">
-            <h2 class="text-xl font-bold text-slate-100 mb-4 flex items-center justify-between">
-                <span><i class="fa-solid fa-list-check text-pink-400"></i> Registro de Plazos</span>
-                <span id="contadorRegistros" class="text-sm font-normal text-slate-400 bg-slate-900 px-3 py-1 rounded-full border border-slate-700">0 Registros</span>
-            </h2>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-sm text-slate-300">
-                    <thead class="bg-slate-900/60 uppercase text-xs text-slate-400 border-b border-slate-700">
-                        <tr>
-                            <th class="py-3 px-4">Participante</th>
-                            <th class="py-3 px-4">Detalles</th>
-                            <th class="py-3 px-4">Plazo (20 Días)</th>
-                            <th class="py-3 px-4 text-center">Estado</th>
-                            <th class="py-3 px-4 text-center">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tablaCuerpo" class="divide-y divide-slate-700/50"></tbody>
-                </table>
-            </div>
-        </section>
-
-    </div>
-
-    <!-- Módulos de Firebase SDK v10 -->
+    
+    <!-- Firebase SDK v10 -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, setDoc, query, orderBy, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // CONFIGURACIÓN DE TU FIREBASE REAL (lista-musica-ia)
         const firebaseConfig = {
-            apiKey: "AIzaSyBVEWu7BbvKF-xlCwTU8RxMlvRSA54BoqU",
+            apiKey: "AIzaSy...", // Tu clave de Firebase
             authDomain: "lista-musica-ia.firebaseapp.com",
             projectId: "lista-musica-ia",
-            storageBucket: "lista-musica-ia.firebasestorage.app",
-            messagingSenderId: "60825175129",
-            appId: "1:60825175129:web:ccd8dc08480074ca755d48"
+            storageBucket: "lista-musica-ia.appspot.com",
+            messagingSenderId: "1234567890",
+            appId: "1:1234567890:web:abcdef123456"
         };
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-        const registrosRef = collection(db, "solicitudes_musica");
 
-        let registros = [];
-        let selectedRegistroId = null;
-        let pendingAction = null;
+        let plazaAbierta = false;
+        let esAdmin = sessionStorage.getItem('is_dj_admin') === 'true';
+        let diasPlazoDefecto = 20;
 
-        document.getElementById('fechaInicio').valueAsDate = new Date();
-
-        // Escuchador en tiempo real de Firestore
-        onSnapshot(registrosRef, (snapshot) => {
-            registros = [];
-            snapshot.forEach((doc) => {
-                registros.push({ id: doc.id, ...doc.data() });
-            });
-            if (registros.length > 0 && !selectedRegistroId) {
-                selectedRegistroId = registros[0].id;
+        // Escuchar configuración global (Plaza y Días de Plazo)
+        onSnapshot(doc(db, "configuracion", "estado_plaza"), (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                plazaAbierta = data.abierta ?? false;
+                diasPlazoDefecto = data.diasPlazo ?? 20;
+            } else {
+                plazaAbierta = false;
+                diasPlazoDefecto = 20;
             }
-            renderizarTabla();
-            renderizarCalendario();
+            actualizarInterfaz();
         });
 
-        // Formulario submit
-        document.getElementById('registroForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const nombre = document.getElementById('nombre').value;
-            const perfil = document.getElementById('perfil').value;
-            const nombre2 = document.getElementById('nombre2').value;
-            const nombre3 = document.getElementById('nombre3').value;
-            const fechaInicio = document.getElementById('fechaInicio').value;
-            const dias = parseInt(document.getElementById('diasPlazo').value);
-
-            const fIn = new Date(fechaInicio);
-            const fFin = new Date(fIn);
-            fFin.setDate(fFin.getDate() + dias);
-
-            await addDoc(registrosRef, {
-                nombre, perfil, nombre2, nombre3,
-                fechaInicio: fIn.toISOString().split('T')[0],
-                fechaFin: fFin.toISOString().split('T')[0],
-                dias,
-                forzadoCerrado: false,
-                creado: new Date().getTime()
-            });
-
-            e.target.reset();
-            document.getElementById('fechaInicio').valueAsDate = new Date();
-            document.getElementById('diasPlazo').value = 20;
-        });
-
-        function estaAbierto(reg) {
-            if (reg.forzadoCerrado) return false;
-            const hoy = new Date().setHours(0,0,0,0);
-            const fin = new Date(reg.fechaFin).setHours(0,0,0,0);
-            return hoy <= fin;
-        }
-
-        function renderizarTabla() {
-            const tbody = document.getElementById('tablaCuerpo');
-            tbody.innerHTML = '';
-            document.getElementById('contadorRegistros').textContent = `${registros.length} Registros`;
-
-            if (registros.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-slate-500">No hay registros activos en vivo.</td></tr>`;
+        // Escuchar lista de solicitudes en tiempo real
+        const q = query(collection(db, "solicitudes_musica"), orderBy("creado", "desc"));
+        onSnapshot(q, (snapshot) => {
+            const listaContenedor = document.getElementById('listaSolicitudes');
+            listaContenedor.innerHTML = '';
+            
+            if (snapshot.empty) {
+                listaContenedor.innerHTML = `<div class="text-center text-slate-500 py-6 text-sm">No hay solicitudes en la lista por ahora.</div>`;
                 return;
             }
 
-            registros.forEach((reg) => {
-                const abierto = estaAbierto(reg);
-                const isSelected = reg.id === selectedRegistroId;
-                const tr = document.createElement('tr');
-                tr.className = `hover:bg-slate-700/30 transition cursor-pointer ${isSelected ? 'bg-slate-700/40 border-l-4 border-purple-500' : ''}`;
-                tr.onclick = () => { selectedRegistroId = reg.id; renderizarTabla(); renderizarCalendario(); };
-
-                tr.innerHTML = `
-                    <td class="py-3 px-4">
-                        <div class="font-bold text-white">${reg.nombre}</div>
-                        <div class="text-xs text-purple-400">@${reg.perfil.replace('@','')}</div>
-                    </td>
-                    <td class="py-3 px-4 text-xs">
-                        <div><span class="text-slate-500">Artístico:</span> ${reg.nombre2 || '-'}</div>
-                        <div><span class="text-slate-500">Canción:</span> ${reg.nombre3 || '-'}</div>
-                    </td>
-                    <td class="py-3 px-4 text-xs">
-                        <div><i class="fa-regular fa-calendar-check text-green-400"></i> ${reg.fechaInicio}</div>
-                        <div class="font-semibold text-amber-400"><i class="fa-regular fa-calendar-xmark"></i> ${reg.fechaFin} (${reg.dias}d)</div>
-                    </td>
-                    <td class="py-3 px-4 text-center">
-                        ${abierto ? `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-600 text-white">Abierto</span>` : `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-red-600 text-white">Cerrado</span>`}
-                    </td>
-                    <td class="py-3 px-4 text-center space-x-1" onclick="event.stopPropagation()">
-                        ${abierto ? `<button data-id="${reg.id}" data-action="cerrar" class="btn-state px-2 py-1 bg-red-600 hover:bg-red-500 text-white text-xs rounded">Cerrar</button>` : `<button data-id="${reg.id}" data-action="abrir" class="btn-state px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded">Reabrir</button>`}
-                        <button data-id="${reg.id}" class="btn-delete px-2 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs rounded"><i class="fa-solid fa-trash"></i></button>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-
-            // Handlers para botones
-            document.querySelectorAll('.btn-state').forEach(btn => {
-                btn.onclick = (e) => {
-                    const id = e.target.dataset.id;
-                    const action = e.target.dataset.action;
-                    solicitarCambioEstado(id, action);
-                };
-            });
-            document.querySelectorAll('.btn-delete').forEach(btn => {
-                btn.onclick = (e) => solicitarEliminacion(e.target.closest('button').dataset.id);
-            });
-        }
-
-        function renderizarCalendario() {
-            const grid = document.getElementById('calendarGrid');
-            grid.innerHTML = '';
-            const hoy = new Date();
-            const año = hoy.getFullYear();
-            const mes = hoy.getMonth();
-
-            const nombresMeses = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-            document.getElementById('calendarMonthYear').textContent = `${nombresMeses[mes]} ${año}`;
-
-            const primerDiaMes = new Date(año, mes, 1);
-            const ultimoDiaMes = new Date(año, mes + 1, 0);
-
-            let diaSemanaInicio = primerDiaMes.getDay() - 1;
-            if (diaSemanaInicio === -1) diaSemanaInicio = 6;
-
-            for (let i = 0; i < diaSemanaInicio; i++) {
-                const empty = document.createElement('div');
-                empty.className = 'day-cell text-slate-700 opacity-20';
-                grid.appendChild(empty);
-            }
-
-            let regSel = registros.find(r => r.id === selectedRegistroId);
-
-            for (let d = 1; d <= ultimoDiaMes.getDate(); d++) {
-                const fechaCelda = new Date(año, mes, d);
-                fechaCelda.setHours(0,0,0,0);
-                const cell = document.createElement('div');
-                cell.className = 'day-cell bg-slate-900/60 border border-slate-700/50';
-
-                const esHoy = fechaCelda.getTime() === new Date().setHours(0,0,0,0);
-                if (esHoy) cell.classList.add('day-today');
-
-                if (regSel) {
-                    const fIn = new Date(regSel.fechaInicio).setHours(0,0,0,0);
-                    const fFin = new Date(regSel.fechaFin).setHours(0,0,0,0);
-                    if (fechaCelda.getTime() >= fIn && fechaCelda.getTime() <= fFin) {
-                        cell.classList.add('day-in-range');
-                    }
+            snapshot.forEach((docItem) => {
+                const data = docItem.data();
+                const id = docItem.id;
+                
+                const card = document.createElement('div');
+                card.className = "bg-slate-800 border border-slate-700 rounded-xl p-4 space-y-2 shadow-lg relative";
+                
+                let btnBorrarHtml = '';
+                if (esAdmin) {
+                    btnBorrarHtml = `
+                        <button onclick="borrarSolicitud('${id}')" class="text-red-400 hover:text-red-300 text-xs bg-red-950/50 border border-red-800/50 px-2.5 py-1 rounded transition">
+                            <i class="fa-solid fa-trash mr-1"></i>Borrar
+                        </button>`;
                 }
 
-                cell.innerHTML = `<span>${d}</span>${esHoy ? '<span class="text-[9px] text-purple-400 font-bold">HOY</span>' : ''}`;
-                grid.appendChild(cell);
+                card.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span class="text-amber-400 font-bold text-lg">${data.nombre}</span>
+                            <span class="text-slate-400 text-xs block">${data.perfil}</span>
+                        </div>
+                        ${btnBorrarHtml}
+                    </div>
+                    
+                    <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-700/50 text-xs text-slate-300 space-y-1 mt-2">
+                        <p><strong class="text-amber-400"><i class="fa-solid fa-calendar-day mr-1"></i>Plazo ${data.dias || 20} días:</strong> Del ${data.fechaInicio} al ${data.fechaFin}</p>
+                        ${data.estiloMusica ? `<p><strong class="text-slate-200">Estilo:</strong> ${data.estiloMusica} \vert{} <strong>Tono:</strong>${data.tonoMensaje}</p>` : ''}
+                        ${data.personalidad ? `<p><strong class="text-slate-200">Carácter:</strong> ${data.personalidad}</p>` : ''}
+                        ${data.anecdota ? `<p><strong class="text-slate-200">Anécdota:</strong> ${data.anecdota}</p>` : ''}
+                    </div>
+                `;
+                listaContenedor.appendChild(card);
+            });
+        });
+
+        // Funciones de Administrador
+        window.abrirModalAdmin = function() {
+            if (esAdmin) {
+                esAdmin = false;
+                sessionStorage.removeItem('is_dj_admin');
+                actualizarInterfaz();
+                return;
+            }
+            document.getElementById('modalLoginAdmin').classList.remove('hidden');
+            document.getElementById('modalLoginAdmin').classList.add('flex');
+        };
+
+        window.cerrarModalAdmin = function() {
+            document.getElementById('modalLoginAdmin').classList.add('hidden');
+            document.getElementById('modalLoginAdmin').classList.remove('flex');
+            document.getElementById('claveAdminInput').value = '';
+        };
+
+        window.verificarClaveAdmin = function(e) {
+            e.preventDefault();
+            const clave = document.getElementById('claveAdminInput').value;
+            if (clave === "spumout2026") {
+                esAdmin = true;
+                sessionStorage.setItem('is_dj_admin', 'true');
+                cerrarModalAdmin();
+                actualizarInterfaz();
+            } else {
+                alert("Contraseña incorrecta.");
+            }
+        };
+
+        window.cambiarEstadoPlaza = async function(nuevoEstado) {
+            if (!esAdmin) return;
+            const mensaje = nuevoEstado ? "¿Deseas ABRIR las plazas?" : "¿Deseas CERRAR las plazas?";
+            if (confirm(mensaje)) {
+                try {
+                    await setDoc(doc(db, "configuracion", "estado_plaza"), { 
+                        abierta: nuevoEstado,
+                        diasPlazo: diasPlazoDefecto 
+                    });
+                } catch (e) { console.error(e); }
+            }
+        };
+
+        window.guardarDiasPlazo = async function() {
+            if (!esAdmin) return;
+            const nuevoDias = parseInt(document.getElementById('inputDiasPlazo').value);
+            if (nuevoDias && nuevoDias > 0) {
+                try {
+                    await setDoc(doc(db, "configuracion", "estado_plaza"), { 
+                        abierta: plazaAbierta,
+                        diasPlazo: nuevoDias 
+                    });
+                    alert(`Plazo actualizado a ${nuevoDias} días.`);
+                } catch (e) { console.error(e); }
+            }
+        };
+
+        window.modoVistaPublica = function() {
+            esAdmin = false;
+            sessionStorage.removeItem('is_dj_admin');
+            actualizarInterfaz();
+        };
+
+        window.borrarSolicitud = async function(id) {
+            if (confirm("¿Seguro que deseas borrar esta solicitud de la lista?")) {
+                try { await deleteDoc(doc(db, "solicitudes_musica", id)); } catch (e) { console.error(e); }
+            }
+        };
+
+        function actualizarInterfaz() {
+            const badge = document.getElementById('statusBadge');
+            const formContainer = document.getElementById('formPaso1Container');
+            const alertClosed = document.getElementById('alertClosed');
+            const adminPanel = document.getElementById('adminPanel');
+            const adminBadge = document.getElementById('adminBadge');
+
+            if (esAdmin) {
+                adminPanel.classList.remove('hidden');
+                adminBadge.classList.remove('hidden');
+                document.getElementById('inputDiasPlazo').value = diasPlazoDefecto;
+            } else {
+                adminPanel.classList.add('hidden');
+                adminBadge.classList.add('hidden');
+            }
+
+            document.getElementById('textoDiasPlazoPaso1').innerText = `${diasPlazoDefecto} Días de plazo`;
+
+            if (plazaAbierta) {
+                badge.className = "bg-green-500/20 text-green-400 border border-green-500/40 px-4 py-1.5 rounded-full font-bold text-xs inline-flex items-center gap-2";
+                badge.innerHTML = `<span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> PLAZA ABIERTA`;
+                formContainer.classList.remove('hidden');
+                alertClosed.classList.add('hidden');
+            } else {
+                badge.className = "bg-red-500/20 text-red-400 border border-red-500/40 px-4 py-1.5 rounded-full font-bold text-xs inline-flex items-center gap-2";
+                badge.innerHTML = `<span class="w-2 h-2 bg-red-500 rounded-full"></span> PLAZA CERRADA`;
+                formContainer.classList.add('hidden');
+                alertClosed.classList.remove('hidden');
             }
         }
 
-        window.solicitarCambioEstado = (id, accion) => {
-            const reg = registros.find(r => r.id === id);
-            const msg = accion === 'cerrar' ? `¿Desea cancelar el plazo de "${reg.nombre}"?` : `¿Desea reabrir el plazo de "${reg.nombre}"?`;
-            abrirConfirmModal(msg, async () => {
-                await updateDoc(doc(db, "solicitudes_musica", id), { forzadoCerrado: (accion === 'cerrar') });
-            });
+        // Control de los despegables "Otros..."
+        window.evaluarOtrosOption = function(selectId, inputContainerId) {
+            const selectVal = document.getElementById(selectId).value;
+            const container = document.getElementById(inputContainerId);
+            if (selectVal === 'Otros') {
+                container.classList.remove('hidden');
+            } else {
+                container.classList.add('hidden');
+            }
         };
 
-        window.solicitarEliminacion = (id) => {
-            const reg = registros.find(r => r.id === id);
-            abrirConfirmModal(`¿Desea eliminar la solicitud de "${reg.nombre}"?`, async () => {
-                await deleteDoc(doc(db, "solicitudes_musica", id));
-            });
+        window.iniciarEnvio = function(e) {
+            e.preventDefault();
+            if(!plazaAbierta) return;
+
+            const timerOverlay = document.getElementById('timerOverlay');
+            const timerNum = document.getElementById('timerNum');
+            timerOverlay.classList.remove('hidden');
+            timerOverlay.classList.add('flex');
+
+            let segundos = 3;
+            timerNum.innerText = segundos;
+
+            const intervalo = setInterval(() => {
+                segundos--;
+                if(segundos > 0) {
+                    timerNum.innerText = segundos;
+                } else {
+                    clearInterval(intervalo);
+                    timerOverlay.classList.remove('flex');
+                    timerOverlay.classList.add('hidden');
+                    
+                    document.getElementById('modalPlantilla').classList.remove('hidden');
+                    document.getElementById('modalPlantilla').classList.add('flex');
+                }
+            }, 1000);
         };
 
-        function abrirConfirmModal(msg, fn) {
-            document.getElementById('modalMessage').textContent = msg;
-            pendingAction = fn;
-            document.getElementById('confirmModal').classList.remove('hidden');
-        }
+        window.guardarTodo = async function(e) {
+            e.preventDefault();
+            
+            const btn = document.getElementById('btnFinal');
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Guardando...';
+            btn.disabled = true;
 
-        window.closeConfirmModal = (confirmado) => {
-            document.getElementById('confirmModal').classList.add('hidden');
-            if (confirmado && pendingAction) pendingAction();
-            pendingAction = null;
+            const hoy = new Date();
+            const fechaFinObj = new Date();
+            fechaFinObj.setDate(hoy.getDate() + diasPlazoDefecto);
+
+            // Evaluar tono y estilo
+            let tonoFinal = document.getElementById('tonoMensaje').value;
+            if (tonoFinal === 'Otros') {
+                tonoFinal = document.getElementById('inputTonoOtro').value || 'Otros';
+            }
+
+            let estiloFinal = document.getElementById('estiloMusica').value;
+            if (estiloFinal === 'Otros') {
+                estiloFinal = document.getElementById('inputEstiloOtro').value || 'Otros';
+            }
+
+            try {
+                await addDoc(collection(db, "solicitudes_musica"), {
+                    perfil: document.getElementById('perfil').value,
+                    nombre: document.getElementById('nombre').value,
+                    fechaInicio: hoy.toISOString().split('T')[0],
+                    fechaFin: fechaFinObj.toISOString().split('T')[0],
+                    dias: diasPlazoDefecto,
+                    edadCumple: document.getElementById('edadCumple').value,
+                    relacion: document.getElementById('relacion').value,
+                    personalidad: document.getElementById('personalidad').value,
+                    gustos: document.getElementById('gustos').value,
+                    fraseTipica: document.getElementById('fraseTipica').value,
+                    anecdota: document.getElementById('anecdota').value,
+                    queLeHaceEspecial: document.getElementById('queLeHaceEspecial').value,
+                    tonoMensaje: tonoFinal,
+                    estiloMusica: estiloFinal,
+                    creado: Date.now()
+                });
+
+                alert("¡Petición enviada con éxito!");
+                document.getElementById('modalPlantilla').classList.add('hidden');
+                document.getElementById('musicFormPaso1').reset();
+                btn.disabled = false;
+                btn.innerText = "Confirmar y Enviar Solicitud";
+            } catch (err) {
+                console.error("Error guardando:", err);
+                alert("Error al guardar la solicitud.");
+                btn.disabled = false;
+                btn.innerText = "Confirmar y Enviar Solicitud";
+            }
         };
-
-        renderizarCalendario();
     </script>
+</head>
+<body class="bg-slate-900 text-white min-h-screen p-4 md:p-8 font-sans relative pb-20">
+
+    <!-- CROWN DE ADMIN -->
+    <div id="adminBadge" class="hidden fixed top-3 right-3 bg-amber-500/20 border border-amber-500/50 text-amber-300 px-3 py-1.5 rounded-full text-xs font-bold shadow-lg flex items-center gap-1.5 z-30">
+        <i class="fa-solid fa-crown text-amber-400 animate-bounce"></i> Modo Administrador Activo
+    </div>
+
+    <div class="max-w-2xl mx-auto space-y-6">
+        
+        <!-- Header -->
+        <header class="text-center space-y-3">
+            <h1 class="text-3xl font-bold text-amber-400"><i class="fa-solid fa-music mr-2"></i>Lista Música de IA</h1>
+            
+            <div id="statusBadge" class="bg-slate-800 border border-slate-700 px-4 py-2 rounded-full text-xs inline-block">
+                Cargando estado...
+            </div>
+
+            <!-- PANEL DE CONTROL DJ -->
+            <div id="adminPanel" class="hidden bg-slate-800/90 border border-amber-500/40 p-4 rounded-xl space-y-3 shadow-inner mt-2">
+                <div class="flex items-center justify-between border-b border-slate-700/60 pb-2">
+                    <span class="text-xs text-amber-400 font-bold flex items-center gap-1"><i class="fa-solid fa-crown"></i> Panel DJ Spumout</span>
+                    <button onclick="modoVistaPublica()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs px-2.5 py-1 rounded transition">
+                        <i class="fa-solid fa-eye mr-1"></i>Vista Público
+                    </button>
+                </div>
+                
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex gap-2">
+                        <button onclick="cambiarEstadoPlaza(true)" class="bg-green-600 hover:bg-green-500 text-white text-xs font-bold px-3 py-2 rounded-lg transition flex items-center gap-1">
+                            <i class="fa-solid fa-lock-open"></i> Abrir Plaza
+                        </button>
+                        <button onclick="cambiarEstadoPlaza(false)" class="bg-red-600 hover:bg-red-500 text-white text-xs font-bold px-3 py-2 rounded-lg transition flex items-center gap-1">
+                            <i class="fa-solid fa-lock"></i> Cerrar Plaza
+                        </button>
+                    </div>
+
+                    <!-- Editar Días de Plazo -->
+                    <div class="flex items-center gap-1.5 bg-slate-900/90 p-1.5 rounded-lg border border-slate-700">
+                        <label class="text-xs text-slate-400 pl-1">Días plazo:</label>
+                        <input type="number" id="inputDiasPlazo" value="20" min="1" max="90" class="w-16 bg-slate-800 text-white text-xs text-center border border-slate-700 rounded p-1">
+                        <button onclick="guardarDiasPlazo()" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs px-2 py-1 rounded transition">
+                            Guardar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- AVISO CERRADO -->
+        <div id="alertClosed" class="bg-slate-800/80 border border-slate-700 p-6 rounded-xl text-center space-y-2 hidden">
+            <i class="fa-solid fa-lock text-3xl text-red-400 mb-1 block"></i>
+            <h3 class="text-lg font-bold text-slate-200">Plazas actualmente cerradas</h3>
+            <p class="text-xs text-slate-400">Permanece atento al directo de DJ Spumout para saber cuándo abre la próxima plaza.</p>
+        </div>
+
+        <!-- FORMULARIO PASO 1 -->
+        <div id="formPaso1Container" class="hidden">
+            <form id="musicFormPaso1" onsubmit="iniciarEnvio(event)" class="bg-slate-800 p-6 rounded-xl border border-slate-700 space-y-4 shadow-2xl">
+                <div>
+                    <label class="block text-xs text-slate-300 mb-1">Tu Usuario / Perfil de TikTok *</label>
+                    <input type="text" id="perfil" required placeholder="@tu_usuario" class="w-full bg-slate-900 border border-slate-700 rounded p-3 text-sm text-white focus:outline-none focus:border-amber-400">
+                </div>
+
+                <div>
+                    <label class="block text-xs text-slate-300 mb-1">Nombre / Apodo del destinatario *</label>
+                    <input type="text" id="nombre" required placeholder="Ej: Santi / Tío Juan" class="w-full bg-slate-900 border border-slate-700 rounded p-3 text-sm text-white focus:outline-none focus:border-amber-400">
+                </div>
+
+                <div class="bg-slate-900 p-3 rounded-lg border border-slate-700 text-center">
+                    <p class="text-xs text-slate-400">Plazo asignado automáticamente:</p>
+                    <p id="textoDiasPlazoPaso1" class="text-base font-bold text-amber-400"><i class="fa-solid fa-calendar-days mr-2"></i>20 Días de plazo</p>
+                </div>
+
+                <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 rounded-lg transition duration-200 shadow-lg text-base">
+                    <i class="fa-solid fa-paper-plane mr-2"></i>Enviar Solicitud
+                </button>
+            </form>
+        </div>
+
+        <!-- LISTA DE SOLICITUDES -->
+        <div class="space-y-3 pt-4">
+            <h2 class="text-xl font-bold text-amber-400 flex items-center gap-2">
+                <i class="fa-solid fa-list-check"></i> Solicitudes Activas en la Lista
+            </h2>
+            <div id="listaSolicitudes" class="space-y-3">
+                <div class="text-center text-slate-500 py-6">Cargando lista de solicitudes...</div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- BOTÓN ESCUDO DE ADMIN -->
+    <button onclick="abrirModalAdmin()" title="Acceso Admin" class="fixed bottom-3 right-3 bg-slate-800/60 hover:bg-slate-700 text-slate-500 hover:text-amber-400 p-2.5 rounded-full border border-slate-700/50 transition duration-200 text-xs opacity-40 hover:opacity-100 z-30">
+        <i class="fa-solid fa-user-shield"></i>
+    </button>
+
+    <!-- MODAL DE LOGIN ADMIN (SE CIERRA AL PULSAR FUERA) -->
+    <div id="modalLoginAdmin" onclick="if(event.target === this) cerrarModalAdmin()" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden justify-center items-center z-50 p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-xs w-full space-y-4 shadow-2xl relative">
+            <button onclick="cerrarModalAdmin()" class="absolute top-3 right-3 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            <h3 class="text-amber-400 font-bold text-base flex items-center gap-2"><i class="fa-solid fa-crown"></i> Acceso Admin</h3>
+            <form onsubmit="verificarClaveAdmin(event)" class="space-y-3">
+                <input type="password" id="claveAdminInput" placeholder="Contraseña Admin" required class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-400">
+                <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-2 rounded text-xs transition">Acceder</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- CUENTA ATRÁS 3s -->
+    <div id="timerOverlay" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md hidden justify-center items-center z-50 flex-col space-y-4">
+        <div class="text-amber-400 text-6xl font-extrabold animate-bounce" id="timerNum">3</div>
+        <p class="text-xl font-semibold text-white">Procesando solicitud...</p>
+        <p class="text-sm text-slate-400">Preparando plantilla personalizada...</p>
+    </div>
+
+    <!-- MODAL PLANTILLA EMERGENTE (SE CIERRA SI SE PULSA FUERA) -->
+    <div id="modalPlantilla" onclick="if(event.target === this) document.getElementById('modalPlantilla').classList.add('hidden')" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md hidden justify-center items-center z-40 p-4 overflow-y-auto">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-2xl w-full my-8 space-y-6 shadow-2xl relative">
+            
+            <button onclick="document.getElementById('modalPlantilla').classList.add('hidden')" class="absolute top-4 right-4 text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+
+            <div class="text-center border-b border-slate-700 pb-4">
+                <h2 class="text-2xl font-bold text-amber-400"><i class="fa-solid fa-sliders mr-2"></i>Personaliza la Canción</h2>
+                <p class="text-xs text-slate-400 mt-1">Rellena esta ficha para que la canción quede perfecta</p>
+            </div>
+
+            <form onsubmit="guardarTodo(event)" class="space-y-4 text-sm max-h-[70vh] overflow-y-auto pr-2">
+                
+                <div class="space-y-3">
+                    <h3 class="font-bold text-amber-400 flex items-center gap-2"><i class="fa-solid fa-user"></i> 1. Básico</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <input type="text" id="edadCumple" placeholder="Edad o cumpleaños (Ej: 25 años)" class="bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                        <input type="text" id="relacion" placeholder="Relación (Hijo, Tío, Amigo...)" class="bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                    </div>
+                </div>
+
+                <div class="space-y-3 border-t border-slate-700 pt-3">
+                    <h3 class="font-bold text-amber-400 flex items-center gap-2"><i class="fa-solid fa-masks-theater"></i> 2. Personalidad</h3>
+                    <input type="text" id="personalidad" placeholder="¿Cómo es? (Gracioso, trabajador, rebelde...)" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                    <input type="text" id="gustos" placeholder="¿Qué le gusta? (Fútbol, coches, flamenco...)" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                    <input type="text" id="fraseTipica" placeholder="Frase típica que siempre dice..." class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                </div>
+
+                <div class="space-y-3 border-t border-slate-700 pt-3">
+                    <h3 class="font-bold text-amber-400 flex items-center gap-2"><i class="fa-solid fa-book-bookmark"></i> 3. Recuerdos</h3>
+                    <textarea id="anecdota" placeholder="Anécdota especial con la familia..." class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white" rows="2"></textarea>
+                    <input type="text" id="queLeHaceEspecial" placeholder="¿Qué le hace único / especial?" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                </div>
+
+                <div class="space-y-3 border-t border-slate-700 pt-3">
+                    <h3 class="font-bold text-amber-400 flex items-center gap-2"><i class="fa-solid fa-heart"></i> 4. Intención y Estilo</h3>
+                    
+                    <!-- Desplegable Intención -->
+                    <div>
+                        <select id="tonoMensaje" onchange="evaluarOtrosOption('tonoMensaje', 'containerTonoOtro')" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                            <option value="Emocionar ❤️">Emocionar ❤️</option>
+                            <option value="Divertido 😂">Divertido 😂</option>
+                            <option value="Motivador 💪">Motivador 💪</option>
+                            <option value="Otros">Otros...</option>
+                        </select>
+                        <div id="containerTonoOtro" class="hidden mt-2">
+                            <input type="text" id="inputTonoOtro" placeholder="Escribe la intención o mensaje..." class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                        </div>
+                    </div>
+
+                    <!-- Desplegable Estilo Musical -->
+                    <div>
+                        <select id="estiloMusica" onchange="evaluarOtrosOption('estiloMusica', 'containerEstiloOtro')" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                            <option value="Flamenco Moderno">Flamenco Moderno</option>
+                            <option value="Sevillanas / Rumba Española">Sevillanas / Rumba Española</option>
+                            <option value="Reggaetón">Reggaetón</option>
+                            <option value="Trap / Urbano">Trap / Urbano</option>
+                            <option value="Balada">Balada</option>
+                            <option value="Himno">Tipo "Himno"</option>
+                            <option value="Hardstyle">Hardstyle</option>
+                            <option value="K-pop">K-pop</option>
+                            <option value="Otros">Otros...</option>
+                        </select>
+                        <div id="containerEstiloOtro" class="hidden mt-2">
+                            <input type="text" id="inputEstiloOtro" placeholder="Escribe el estilo musical que quieres..." class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                        </div>
+                    </div>
+                </div>
+
+                <button id="btnFinal" type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 rounded-lg transition duration-200 mt-4 text-base">
+                    Confirmar y Enviar Solicitud
+                </button>
+            </form>
+
+        </div>
+    </div>
+
 </body>
 </html>
