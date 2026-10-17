@@ -13,7 +13,7 @@
         import { getFirestore, collection, addDoc, onSnapshot, doc, setDoc, query, orderBy, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
-            apiKey: "AIzaSy...", // Tu clave de Firebase
+            apiKey: "AIzaSy...", 
             authDomain: "lista-musica-ia.firebaseapp.com",
             projectId: "lista-musica-ia",
             storageBucket: "lista-musica-ia.appspot.com",
@@ -26,22 +26,47 @@
 
         let plazaAbierta = false;
         let esAdmin = sessionStorage.getItem('is_dj_admin') === 'true';
-        let diasPlazoDefecto = 20;
+        let fechaInicioGlobal = "";
+        let fechaFinPlazoGlobal = "";
 
-        // Escuchar configuración global (Plaza y Días de Plazo)
+        // Formato DD/MM/AAAA
+        function formatearFechaEsp(fechaStr) {
+            if (!fechaStr) return "";
+            const partes = fechaStr.split("-");
+            if (partes.length === 3) {
+                return `${partes[2]}/${partes[1]}/${partes[0]}`;
+            }
+            return fechaStr;
+        }
+
+        // Sumar N días a una fecha dada
+        function sumarDiasAFecha(fechaBaseStr, numDias = 20) {
+            const base = fechaBaseStr ? new Date(fechaBaseStr) : new Date();
+            base.setDate(base.getDate() + numDias);
+            return base.toISOString().split('T')[0];
+        }
+
+        // Obtener fecha de hoy en ISO (AAAA-MM-DD)
+        function obtenerHoyISO() {
+            return new Date().toISOString().split('T')[0];
+        }
+
+        // Escuchar configuración global
         onSnapshot(doc(db, "configuracion", "estado_plaza"), (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
                 plazaAbierta = data.abierta ?? false;
-                diasPlazoDefecto = data.diasPlazo ?? 20;
+                fechaInicioGlobal = data.fechaInicio || obtenerHoyISO();
+                fechaFinPlazoGlobal = data.fechaFinPlazo || sumarDiasAFecha(fechaInicioGlobal, 20);
             } else {
                 plazaAbierta = false;
-                diasPlazoDefecto = 20;
+                fechaInicioGlobal = obtenerHoyISO();
+                fechaFinPlazoGlobal = sumarDiasAFecha(fechaInicioGlobal, 20);
             }
             actualizarInterfaz();
         });
 
-        // Escuchar lista de solicitudes en tiempo real
+        // Escuchar solicitudes
         const q = query(collection(db, "solicitudes_musica"), orderBy("creado", "desc"));
         onSnapshot(q, (snapshot) => {
             const listaContenedor = document.getElementById('listaSolicitudes');
@@ -59,35 +84,50 @@
                 const card = document.createElement('div');
                 card.className = "bg-slate-800 border border-slate-700 rounded-xl p-4 space-y-2 shadow-lg relative";
                 
-                let btnBorrarHtml = '';
+                let accionesAdminHtml = '';
+                let detallesPrivadosHtml = '';
+
                 if (esAdmin) {
-                    btnBorrarHtml = `
-                        <button onclick="borrarSolicitud('${id}')" class="text-red-400 hover:text-red-300 text-xs bg-red-950/50 border border-red-800/50 px-2.5 py-1 rounded transition">
-                            <i class="fa-solid fa-trash mr-1"></i>Borrar
-                        </button>`;
+                    accionesAdminHtml = `
+                        <div class="flex items-center gap-2">
+                            <button onclick='copiarFichaIA(${JSON.stringify(data)})' class="text-amber-400 hover:text-amber-300 text-xs bg-amber-950/40 border border-amber-800/50 px-2.5 py-1 rounded transition flex items-center gap-1">
+                                <i class="fa-solid fa-copy"></i> Copiar Ficha para IA
+                            </button>
+                            <button onclick="borrarSolicitud('${id}')" class="text-red-400 hover:text-red-300 text-xs bg-red-950/50 border border-red-800/50 px-2.5 py-1 rounded transition flex items-center gap-1">
+                                <i class="fa-solid fa-trash"></i> Borrar
+                            </button>
+                        </div>`;
+
+                    detallesPrivadosHtml = `
+                        <div class="bg-slate-900/90 p-3 rounded-lg border border-amber-500/30 text-xs text-slate-300 space-y-1 mt-2">
+                            <p class="text-amber-400 font-bold border-b border-slate-800 pb-1 mb-1"><i class="fa-solid fa-user-lock mr-1"></i>Detalles Reservados (Solo Admin):</p>
+                            ${data.estiloMusica ? `<p><strong class="text-slate-200">Estilo:</strong> ${data.estiloMusica} \vert{} <strong>Tono:</strong>${data.tonoMensaje}</p>` : ''}
+                            ${data.personalidad ? `<p><strong class="text-slate-200">Carácter:</strong> ${data.personalidad}</p>` : ''}
+                            ${data.gustos ? `<p><strong class="text-slate-200">Gustos:</strong> ${data.gustos}</p>` : ''}
+                            ${data.anecdota ? `<p><strong class="text-slate-200">Anécdota:</strong> ${data.anecdota}</p>` : ''}
+                        </div>`;
                 }
 
                 card.innerHTML = `
-                    <div class="flex justify-between items-start">
+                    <div class="flex justify-between items-start flex-wrap gap-2">
                         <div>
                             <span class="text-amber-400 font-bold text-lg">${data.nombre}</span>
                             <span class="text-slate-400 text-xs block">${data.perfil}</span>
                         </div>
-                        ${btnBorrarHtml}
+                        ${accionesAdminHtml}
                     </div>
                     
-                    <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-700/50 text-xs text-slate-300 space-y-1 mt-2">
-                        <p><strong class="text-amber-400"><i class="fa-solid fa-calendar-day mr-1"></i>Plazo ${data.dias || 20} días:</strong> Del ${data.fechaInicio} al ${data.fechaFin}</p>
-                        ${data.estiloMusica ? `<p><strong class="text-slate-200">Estilo:</strong> ${data.estiloMusica} \vert{} <strong>Tono:</strong>${data.tonoMensaje}</p>` : ''}
-                        ${data.personalidad ? `<p><strong class="text-slate-200">Carácter:</strong> ${data.personalidad}</p>` : ''}
-                        ${data.anecdota ? `<p><strong class="text-slate-200">Anécdota:</strong> ${data.anecdota}</p>` : ''}
+                    <div class="bg-slate-900/60 p-2.5 rounded-lg border border-slate-700/50 text-xs text-slate-300 mt-2">
+                        <p><strong class="text-amber-400"><i class="fa-solid fa-calendar-day mr-1"></i>Plazo de entrega:</strong> Del ${formatearFechaEsp(data.fechaInicio)} al ${formatearFechaEsp(data.fechaFin)}</p>
                     </div>
+
+                    ${detallesPrivadosHtml}
                 `;
                 listaContenedor.appendChild(card);
             });
         });
 
-        // Funciones de Administrador
+        // Administrador
         window.abrirModalAdmin = function() {
             if (esAdmin) {
                 esAdmin = false;
@@ -118,32 +158,65 @@
             }
         };
 
+        // ACCIÓN AL CAMBIAR ESTADO PLAZA (ABRIR / CERRAR)
         window.cambiarEstadoPlaza = async function(nuevoEstado) {
             if (!esAdmin) return;
-            const mensaje = nuevoEstado ? "¿Deseas ABRIR las plazas?" : "¿Deseas CERRAR las plazas?";
-            if (confirm(mensaje)) {
-                try {
-                    await setDoc(doc(db, "configuracion", "estado_plaza"), { 
-                        abierta: nuevoEstado,
-                        diasPlazo: diasPlazoDefecto 
-                    });
-                } catch (e) { console.error(e); }
+            
+            if (nuevoEstado) {
+                fechaInicioGlobal = obtenerHoyISO();
+                fechaFinPlazoGlobal = sumarDiasAFecha(fechaInicioGlobal, 20);
+                await guardarEstadoPlazaBD(true, fechaInicioGlobal, fechaFinPlazoGlobal);
+            } else {
+                if (confirm("¿Deseas CERRAR la plaza?")) {
+                    await guardarEstadoPlazaBD(false, fechaInicioGlobal, fechaFinPlazoGlobal);
+                }
             }
         };
 
-        window.guardarDiasPlazo = async function() {
-            if (!esAdmin) return;
-            const nuevoDias = parseInt(document.getElementById('inputDiasPlazo').value);
-            if (nuevoDias && nuevoDias > 0) {
-                try {
-                    await setDoc(doc(db, "configuracion", "estado_plaza"), { 
-                        abierta: plazaAbierta,
-                        diasPlazo: nuevoDias 
-                    });
-                    alert(`Plazo actualizado a ${nuevoDias} días.`);
-                } catch (e) { console.error(e); }
+        // AL CAMBIAR LA FECHA DE INICIO
+        window.alCambiarFechaInicio = function() {
+            const nuevaIni = document.getElementById('inputFechaInicioPanel').value;
+            if (nuevaIni) {
+                fechaInicioGlobal = nuevaIni;
+                fechaFinPlazoGlobal = sumarDiasAFecha(nuevaIni, 20);
+                document.getElementById('inputFechaFinPanel').value = fechaFinPlazoGlobal;
             }
         };
+
+        // AL CAMBIAR LA FECHA FIN A MANO
+        window.alCambiarFechaFin = function() {
+            const nuevaFin = document.getElementById('inputFechaFinPanel').value;
+            const fecha20Sugerida = sumarDiasAFecha(fechaInicioGlobal, 20);
+
+            if (nuevaFin !== fecha20Sugerida) {
+                const aceptarCambio = confirm(`ℹ️ Recordatorio de Sistema:\n\nLa referencia automática por defecto es de 20 DÍAS (hasta el ${formatearFechaEsp(fecha20Sugerida)}).\n\n¿Estás seguro de que quieres cambiar manualmente la Fecha de Cierre al ${formatearFechaEsp(nuevaFin)}?`);
+                
+                if (aceptarCambio) {
+                    fechaFinPlazoGlobal = nuevaFin;
+                } else {
+                    document.getElementById('inputFechaFinPanel').value = fecha20Sugerida;
+                    fechaFinPlazoGlobal = fecha20Sugerida;
+                }
+            } else {
+                fechaFinPlazoGlobal = nuevaFin;
+            }
+        };
+
+        window.guardarFechasPanel = async function() {
+            if (!esAdmin) return;
+            await guardarEstadoPlazaBD(plazaAbierta, fechaInicioGlobal, fechaFinPlazoGlobal);
+            alert(`Fechas de plaza guardadas:\n- Inicio: ${formatearFechaEsp(fechaInicioGlobal)}\n- Cierre: ${formatearFechaEsp(fechaFinPlazoGlobal)}`);
+        };
+
+        async function guardarEstadoPlazaBD(estado, fechaIni, fechaFin) {
+            try {
+                await setDoc(doc(db, "configuracion", "estado_plaza"), { 
+                    abierta: estado,
+                    fechaInicio: fechaIni,
+                    fechaFinPlazo: fechaFin 
+                });
+            } catch (e) { console.error(e); }
+        }
 
         window.modoVistaPublica = function() {
             esAdmin = false;
@@ -157,23 +230,47 @@
             }
         };
 
+        window.copiarFichaIA = function(data) {
+            const textoFicha = `CREAR CANCIÓN DE IA PARA: ${data.nombre} (${data.perfil})
+Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
+----------------------------------------------
+- Edad/Cumpleaños: ${data.edadCumple || 'N/A'}
+- Relación: ${data.relacion || 'N/A'}
+- Personalidad: ${data.personalidad || 'N/A'}
+- Gustos: ${data.gustos || 'N/A'}
+- Frase típica: ${data.fraseTipica || 'N/A'}
+- Anécdota: ${data.anecdota || 'N/A'}
+- Qué le hace especial: ${data.queLeHaceEspecial || 'N/A'}
+- Tono deseado: ${data.tonoMensaje || 'N/A'}
+- Estilo musical: ${data.estiloMusica || 'N/A'}`;
+
+            navigator.clipboard.writeText(textoFicha).then(() => {
+                alert("¡Ficha copiada al portapapeles! Ya puedes pegarla en ChatGPT.");
+            });
+        };
+
         function actualizarInterfaz() {
             const badge = document.getElementById('statusBadge');
             const formContainer = document.getElementById('formPaso1Container');
             const alertClosed = document.getElementById('alertClosed');
             const adminPanel = document.getElementById('adminPanel');
             const adminBadge = document.getElementById('adminBadge');
+            const btnVolverAdmin = document.getElementById('btnVolverAdmin');
 
             if (esAdmin) {
                 adminPanel.classList.remove('hidden');
                 adminBadge.classList.remove('hidden');
-                document.getElementById('inputDiasPlazo').value = diasPlazoDefecto;
+                btnVolverAdmin.classList.add('hidden');
+                document.getElementById('inputFechaInicioPanel').value = fechaInicioGlobal || obtenerHoyISO();
+                document.getElementById('inputFechaFinPanel').value = fechaFinPlazoGlobal || sumarDiasAFecha(fechaInicioGlobal, 20);
             } else {
                 adminPanel.classList.add('hidden');
                 adminBadge.classList.add('hidden');
+                btnVolverAdmin.classList.remove('hidden');
             }
 
-            document.getElementById('textoDiasPlazoPaso1').innerText = `${diasPlazoDefecto} Días de plazo`;
+            const fechaFinMostrar = fechaFinPlazoGlobal || sumarDiasAFecha(fechaInicioGlobal, 20);
+            document.getElementById('textoDiasPlazoPaso1').innerHTML = `<i class="fa-solid fa-calendar-days mr-2"></i>Fecha Límite: ${formatearFechaEsp(fechaFinMostrar)}`;
 
             if (plazaAbierta) {
                 badge.className = "bg-green-500/20 text-green-400 border border-green-500/40 px-4 py-1.5 rounded-full font-bold text-xs inline-flex items-center gap-2";
@@ -188,7 +285,6 @@
             }
         }
 
-        // Control de los despegables "Otros..."
         window.evaluarOtrosOption = function(selectId, inputContainerId) {
             const selectVal = document.getElementById(selectId).value;
             const container = document.getElementById(inputContainerId);
@@ -234,10 +330,9 @@
             btn.disabled = true;
 
             const hoy = new Date();
-            const fechaFinObj = new Date();
-            fechaFinObj.setDate(hoy.getDate() + diasPlazoDefecto);
+            const hoyFormatted = hoy.toISOString().split('T')[0];
+            const fechaFinFinal = fechaFinPlazoGlobal || sumarDiasAFecha(fechaInicioGlobal, 20);
 
-            // Evaluar tono y estilo
             let tonoFinal = document.getElementById('tonoMensaje').value;
             if (tonoFinal === 'Otros') {
                 tonoFinal = document.getElementById('inputTonoOtro').value || 'Otros';
@@ -252,9 +347,8 @@
                 await addDoc(collection(db, "solicitudes_musica"), {
                     perfil: document.getElementById('perfil').value,
                     nombre: document.getElementById('nombre').value,
-                    fechaInicio: hoy.toISOString().split('T')[0],
-                    fechaFin: fechaFinObj.toISOString().split('T')[0],
-                    dias: diasPlazoDefecto,
+                    fechaInicio: hoyFormatted,
+                    fechaFin: fechaFinFinal,
                     edadCumple: document.getElementById('edadCumple').value,
                     relacion: document.getElementById('relacion').value,
                     personalidad: document.getElementById('personalidad').value,
@@ -288,40 +382,64 @@
         <i class="fa-solid fa-crown text-amber-400 animate-bounce"></i> Modo Administrador Activo
     </div>
 
+    <!-- BOTÓN MODO ADMIN -->
+    <button id="btnVolverAdmin" onclick="abrirModalAdmin()" class="fixed top-3 right-3 bg-slate-800/90 border border-amber-500/40 text-amber-400 px-3 py-1.5 rounded-full text-xs font-bold shadow-lg flex items-center gap-1.5 z-30 hover:bg-slate-700 transition">
+        <i class="fa-solid fa-crown"></i> Acceso Admin
+    </button>
+
     <div class="max-w-2xl mx-auto space-y-6">
         
         <!-- Header -->
         <header class="text-center space-y-3">
             <h1 class="text-3xl font-bold text-amber-400"><i class="fa-solid fa-music mr-2"></i>Lista Música de IA</h1>
             
-            <div id="statusBadge" class="bg-slate-800 border border-slate-700 px-4 py-2 rounded-full text-xs inline-block">
+            <!-- BOTONES SUPERIORES: TIKTOK, ABOUT.ME Y SOBRE DJ SPUMOUT -->
+            <div class="flex items-center justify-center gap-2.5 pt-1 flex-wrap">
+                <a href="https://www.tiktok.com/@djspumout?_r=1&_t=ZN-9AdBdXYWWDm" target="_blank" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-1.5 rounded-full text-xs font-semibold transition flex items-center gap-2 shadow hover:border-amber-400">
+                    <i class="fa-brands fa-tiktok text-amber-400"></i> Mi TikTok
+                </a>
+                <a href="https://about.me/djespuma_preseta_a_su_informacio" target="_blank" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-1.5 rounded-full text-xs font-semibold transition flex items-center gap-2 shadow hover:border-amber-400">
+                    <i class="fa-solid fa-user text-amber-400"></i> Mi Información (about.me)
+                </a>
+                <button onclick="document.getElementById('modalInfoSpumout').classList.remove('hidden')" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-1.5 rounded-full text-xs font-semibold transition flex items-center gap-2 shadow hover:border-amber-400">
+                    <i class="fa-solid fa-circle-info text-amber-400"></i> Sobre DJ Spumout
+                </button>
+            </div>
+
+            <div id="statusBadge" class="bg-slate-800 border border-slate-700 px-4 py-2 rounded-full text-xs inline-block mt-2">
                 Cargando estado...
             </div>
 
-            <!-- PANEL DE CONTROL DJ -->
-            <div id="adminPanel" class="hidden bg-slate-800/90 border border-amber-500/40 p-4 rounded-xl space-y-3 shadow-inner mt-2">
+            <!-- PANEL DE CONTROL DJ CON DOBLE CALENDARIO -->
+            <div id="adminPanel" class="hidden bg-slate-800/90 border border-amber-500/40 p-4 rounded-xl space-y-4 shadow-inner mt-2">
                 <div class="flex items-center justify-between border-b border-slate-700/60 pb-2">
                     <span class="text-xs text-amber-400 font-bold flex items-center gap-1"><i class="fa-solid fa-crown"></i> Panel DJ Spumout</span>
                     <button onclick="modoVistaPublica()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs px-2.5 py-1 rounded transition">
-                        <i class="fa-solid fa-eye mr-1"></i>Vista Público
+                        <i class="fa-solid fa-eye mr-1"></i>Ver Vista Público
                     </button>
                 </div>
                 
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <div class="flex gap-2">
-                        <button onclick="cambiarEstadoPlaza(true)" class="bg-green-600 hover:bg-green-500 text-white text-xs font-bold px-3 py-2 rounded-lg transition flex items-center gap-1">
+                <div class="flex flex-col md:flex-row items-center justify-between gap-3">
+                    <div class="flex gap-2 w-full md:w-auto">
+                        <button onclick="cambiarEstadoPlaza(true)" class="flex-1 md:flex-initial bg-green-600 hover:bg-green-500 text-white text-xs font-bold px-3 py-2 rounded-lg transition flex items-center justify-center gap-1">
                             <i class="fa-solid fa-lock-open"></i> Abrir Plaza
                         </button>
-                        <button onclick="cambiarEstadoPlaza(false)" class="bg-red-600 hover:bg-red-500 text-white text-xs font-bold px-3 py-2 rounded-lg transition flex items-center gap-1">
+                        <button onclick="cambiarEstadoPlaza(false)" class="flex-1 md:flex-initial bg-red-600 hover:bg-red-500 text-white text-xs font-bold px-3 py-2 rounded-lg transition flex items-center justify-center gap-1">
                             <i class="fa-solid fa-lock"></i> Cerrar Plaza
                         </button>
                     </div>
 
-                    <!-- Editar Días de Plazo -->
-                    <div class="flex items-center gap-1.5 bg-slate-900/90 p-1.5 rounded-lg border border-slate-700">
-                        <label class="text-xs text-slate-400 pl-1">Días plazo:</label>
-                        <input type="number" id="inputDiasPlazo" value="20" min="1" max="90" class="w-16 bg-slate-800 text-white text-xs text-center border border-slate-700 rounded p-1">
-                        <button onclick="guardarDiasPlazo()" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs px-2 py-1 rounded transition">
+                    <!-- CONTROLES DE FECHA INICIO Y FIN -->
+                    <div class="flex flex-wrap items-center gap-2 bg-slate-900/90 p-2 rounded-lg border border-slate-700 text-xs w-full md:w-auto justify-center">
+                        <div class="flex items-center gap-1">
+                            <label class="text-slate-400">Inicio:</label>
+                            <input type="date" id="inputFechaInicioPanel" onchange="alCambiarFechaInicio()" class="bg-slate-800 text-white border border-slate-700 rounded p-1 text-xs">
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <label class="text-slate-400">Fin Cierre:</label>
+                            <input type="date" id="inputFechaFinPanel" onchange="alCambiarFechaFin()" class="bg-slate-800 text-white border border-slate-700 rounded p-1 text-xs">
+                        </div>
+                        <button onclick="guardarFechasPanel()" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-2 py-1 rounded transition ml-1">
                             Guardar
                         </button>
                     </div>
@@ -351,7 +469,7 @@
 
                 <div class="bg-slate-900 p-3 rounded-lg border border-slate-700 text-center">
                     <p class="text-xs text-slate-400">Plazo asignado automáticamente:</p>
-                    <p id="textoDiasPlazoPaso1" class="text-base font-bold text-amber-400"><i class="fa-solid fa-calendar-days mr-2"></i>20 Días de plazo</p>
+                    <p id="textoDiasPlazoPaso1" class="text-base font-bold text-amber-400"><i class="fa-solid fa-calendar-days mr-2"></i>Fecha Límite: Carga...</p>
                 </div>
 
                 <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 rounded-lg transition duration-200 shadow-lg text-base">
@@ -372,12 +490,38 @@
 
     </div>
 
+    <!-- MODAL INFORMACIÓN CON TU TEXTO EXACTO -->
+    <div id="modalInfoSpumout" onclick="if(event.target === this) this.classList.add('hidden')" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden justify-center items-center z-50 p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-lg w-full space-y-4 shadow-2xl relative my-8">
+            <button onclick="document.getElementById('modalInfoSpumout').classList.add('hidden')" class="absolute top-3 right-3 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            
+            <div class="text-center space-y-1 border-b border-slate-700 pb-3">
+                <h3 class="text-amber-400 font-bold text-lg flex items-center justify-center gap-2"><i class="fa-solid fa-compact-disc text-amber-400 animate-spin"></i> DJ Spumout</h3>
+                <p class="text-xs text-slate-400">Director en Dos Hermanas, España</p>
+            </div>
+
+            <div class="text-xs text-slate-300 space-y-3 leading-relaxed max-h-[60vh] overflow-y-auto pr-2">
+                <p>Hola, soy <strong>DJ Spumout</strong>.</p>
+                <p>Soy DJ, técnico de sonido y productor. Mi objetivo es claro: crear momentos únicos, hacer que la gente disfrute y conectar a través de la música.</p>
+                <p>Tengo una discapacidad que hace que a veces me cueste expresarme, pero eso no me define. Al contrario, me ha hecho más fuerte, constante y con más ganas de demostrar todo lo que soy capaz de hacer.</p>
+                <p>Soy un hombre cercano y respetuoso, con valores claros. Me gusta que la gente se sienta cómoda conmigo, confíe y disfrute sin prejuicios. Defiendo el respeto y la igualdad, y pequeños detalles como pintarme las uñas de rosa forman parte de ese mensaje.</p>
+                <p>Me adapto a todo tipo de público y situaciones: eventos, directos, sesiones… siempre dando lo mejor de mí. Amigos, amigas, clientes o seguidores, todos son bienvenidos a disfrutar y compartir conmigo.</p>
+                <p>Además, creo música personalizada para mis seguidores de TikTok, usando su propio nombre con ayuda de IA comercial. Así cada uno puede tener algo único, pensado solo para él o ella.</p>
+                <p>Si buscas a alguien profesional, auténtico y con buena energía, estás en el lugar correcto.</p>
+                <p>Puedes encontrarme en TikTok, Twitch y otras redes sociales, donde también hago directos y comparto mi trabajo.</p>
+                <p class="text-amber-400 font-bold text-center">Gracias por estar aquí 🙌</p>
+            </div>
+
+            <button onclick="document.getElementById('modalInfoSpumout').classList.add('hidden')" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-2 rounded text-xs transition">Entendido</button>
+        </div>
+    </div>
+
     <!-- BOTÓN ESCUDO DE ADMIN -->
     <button onclick="abrirModalAdmin()" title="Acceso Admin" class="fixed bottom-3 right-3 bg-slate-800/60 hover:bg-slate-700 text-slate-500 hover:text-amber-400 p-2.5 rounded-full border border-slate-700/50 transition duration-200 text-xs opacity-40 hover:opacity-100 z-30">
         <i class="fa-solid fa-user-shield"></i>
     </button>
 
-    <!-- MODAL DE LOGIN ADMIN (SE CIERRA AL PULSAR FUERA) -->
+    <!-- MODAL LOGIN ADMIN -->
     <div id="modalLoginAdmin" onclick="if(event.target === this) cerrarModalAdmin()" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden justify-center items-center z-50 p-4">
         <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-xs w-full space-y-4 shadow-2xl relative">
             <button onclick="cerrarModalAdmin()" class="absolute top-3 right-3 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
@@ -396,7 +540,7 @@
         <p class="text-sm text-slate-400">Preparando plantilla personalizada...</p>
     </div>
 
-    <!-- MODAL PLANTILLA EMERGENTE (SE CIERRA SI SE PULSA FUERA) -->
+    <!-- MODAL PLANTILLA EMERGENTE -->
     <div id="modalPlantilla" onclick="if(event.target === this) document.getElementById('modalPlantilla').classList.add('hidden')" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md hidden justify-center items-center z-40 p-4 overflow-y-auto">
         <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-2xl w-full my-8 space-y-6 shadow-2xl relative">
             
@@ -433,7 +577,6 @@
                 <div class="space-y-3 border-t border-slate-700 pt-3">
                     <h3 class="font-bold text-amber-400 flex items-center gap-2"><i class="fa-solid fa-heart"></i> 4. Intención y Estilo</h3>
                     
-                    <!-- Desplegable Intención -->
                     <div>
                         <select id="tonoMensaje" onchange="evaluarOtrosOption('tonoMensaje', 'containerTonoOtro')" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
                             <option value="Emocionar ❤️">Emocionar ❤️</option>
@@ -446,7 +589,6 @@
                         </div>
                     </div>
 
-                    <!-- Desplegable Estilo Musical -->
                     <div>
                         <select id="estiloMusica" onchange="evaluarOtrosOption('estiloMusica', 'containerEstiloOtro')" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
                             <option value="Flamenco Moderno">Flamenco Moderno</option>
