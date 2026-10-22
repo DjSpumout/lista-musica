@@ -10,7 +10,7 @@
     <!-- Firebase SDK v10 -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, setDoc, query, orderBy, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, setDoc, query, orderBy, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSy...", 
@@ -28,6 +28,7 @@
         let esAdmin = sessionStorage.getItem('is_dj_admin') === 'true';
         let fechaInicioGlobal = "";
         let fechaFinPlazoGlobal = "";
+        let idsEnProcesoAnteriores = new Set();
 
         // Ocultar parcialmente texto para privacidad (ej: Mayka -> M***a)
         function enmascararTexto(texto) {
@@ -74,28 +75,50 @@
             actualizarInterfaz();
         });
 
-        // Escuchar solicitudes y contar total
+        // Escuchar solicitudes, clasificar "En Proceso" vs "En Cola" y avisar en vivo
         const q = query(collection(db, "solicitudes_musica"), orderBy("creado", "desc"));
         onSnapshot(q, (snapshot) => {
-            const listaContenedor = document.getElementById('listaSolicitudes');
+            const contenedorProceso = document.getElementById('listaEnProceso');
+            const contenedorCola = document.getElementById('listaSolicitudes');
             const contadorContenedor = document.getElementById('contadorSolicitudes');
+            const seccionProcesoBox = document.getElementById('seccionEnProcesoBox');
             
-            listaContenedor.innerHTML = '';
+            contenedorProceso.innerHTML = '';
+            contenedorCola.innerHTML = '';
             
             const totalSolicitudes = snapshot.size;
             contadorContenedor.innerText = `(${totalSolicitudes})`;
             
             if (snapshot.empty) {
-                listaContenedor.innerHTML = `<div class="text-center text-slate-500 py-6 text-sm">No hay solicitudes en la lista por ahora.</div>`;
+                seccionProcesoBox.classList.add('hidden');
+                contenedorCola.innerHTML = `<div class="text-center text-slate-500 py-6 text-sm">No hay solicitudes en la lista por ahora.</div>`;
+                idsEnProcesoAnteriores.clear();
                 return;
             }
+
+            let hayAlgunaEnProceso = false;
+            const idsEnProcesoActuales = new Set();
 
             snapshot.forEach((docItem) => {
                 const data = docItem.data();
                 const id = docItem.id;
-                
+                const enProceso = data.enProceso ?? false;
+
+                if (enProceso) {
+                    hayAlgunaEnProceso = true;
+                    idsEnProcesoActuales.add(id);
+
+                    // Si acaba de pasar a "En Proceso" y no somos el Admin, lanzar aviso emergente
+                    if (!idsEnProcesoAnteriores.has(id) && idsEnProcesoAnteriores.size > 0 && !esAdmin) {
+                        const nombreNotif = enmascararTexto(data.nombre);
+                        alert(`🚀 ¡ATENCIÓN EN DIRECTO!\n\nDJ Spumout ha comenzado a trabajar en la canción de: ${nombreNotif}`);
+                    }
+                }
+
                 const card = document.createElement('div');
-                card.className = "bg-slate-800 border border-slate-700 rounded-xl p-4 space-y-2 shadow-lg relative";
+                card.className = enProceso 
+                    ? "bg-amber-950/40 border-2 border-amber-500/80 rounded-xl p-4 space-y-2 shadow-2xl relative animate-pulse"
+                    : "bg-slate-800 border border-slate-700 rounded-xl p-4 space-y-2 shadow-lg relative";
                 
                 let nombreMostrar = esAdmin ? data.nombre : enmascararTexto(data.nombre);
                 let perfilMostrar = esAdmin ? data.perfil : enmascararTexto(data.perfil);
@@ -103,30 +126,48 @@
                 let detallesPrivadosHtml = '';
 
                 if (esAdmin) {
+                    const btnProcesoHtml = enProceso 
+                        ? `<button onclick="cambiarEstadoProceso('${id}', false)" class="text-amber-300 bg-amber-900/60 border border-amber-500/60 text-xs px-2.5 py-1 rounded transition flex items-center gap-1 font-bold">
+                             <i class="fa-solid fa-spinner fa-spin"></i> En Proceso (Quitar)
+                           </button>`
+                        : `<button onclick="cambiarEstadoProceso('${id}', true)" class="text-slate-300 hover:text-amber-300 bg-slate-900 border border-slate-700 hover:border-amber-500/50 text-xs px-2.5 py-1 rounded transition flex items-center gap-1">
+                             <i class="fa-solid fa-play"></i> Pasar a En Proceso
+                           </button>`;
+
                     accionesAdminHtml = `
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            ${btnProcesoHtml}
                             <button onclick='copiarFichaIA(${JSON.stringify(data)})' class="text-amber-400 hover:text-amber-300 text-xs bg-amber-950/40 border border-amber-800/50 px-2.5 py-1 rounded transition flex items-center gap-1">
-                                <i class="fa-solid fa-copy"></i> Copiar Ficha para IA
+                                <i class="fa-solid fa-copy"></i> Copiar Ficha
                             </button>
                             <button onclick="borrarSolicitud('${id}')" class="text-red-400 hover:text-red-300 text-xs bg-red-950/50 border border-red-800/50 px-2.5 py-1 rounded transition flex items-center gap-1">
-                                <i class="fa-solid fa-trash"></i> Borrar
+                                <i class="fa-solid fa-trash"></i>
                             </button>
                         </div>`;
 
                     detallesPrivadosHtml = `
                         <div class="bg-slate-900/90 p-3 rounded-lg border border-amber-500/30 text-xs text-slate-300 space-y-1 mt-2">
                             <p class="text-amber-400 font-bold border-b border-slate-800 pb-1 mb-1"><i class="fa-solid fa-user-lock mr-1"></i>Detalles Reservados (Solo Admin):</p>
-                            ${data.estiloMusica ? `<p><strong class="text-slate-200">Estilo:</strong> ${data.estiloMusica} \vert{} <strong>Tono:</strong>${data.tonoMensaje}</p>` : ''}
+                            ${data.estiloMusica ? `<p><strong class="text-slate-200">Estilo:</strong> ${data.estiloMusica} | <strong>Tono:</strong> ${data.tonoMensaje}</p>` : ''}
                             ${data.personalidad ? `<p><strong class="text-slate-200">Carácter:</strong> ${data.personalidad}</p>` : ''}
                             ${data.gustos ? `<p><strong class="text-slate-200">Gustos:</strong> ${data.gustos}</p>` : ''}
                             ${data.anecdota ? `<p><strong class="text-slate-200">Anécdota:</strong> ${data.anecdota}</p>` : ''}
                         </div>`;
                 }
 
+                const etiquetaEstado = enProceso 
+                    ? `<span class="bg-amber-500 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider inline-flex items-center gap-1">
+                         <i class="fa-solid fa-compact-disc animate-spin"></i> Produciendo Ahora
+                       </span>` 
+                    : '';
+
                 card.innerHTML = `
                     <div class="flex justify-between items-start flex-wrap gap-2">
                         <div>
-                            <span class="text-amber-400 font-bold text-lg">${nombreMostrar}</span>
+                            <div class="flex items-center gap-2">
+                                <span class="text-amber-400 font-bold text-lg">${nombreMostrar}</span>
+                                ${etiquetaEstado}
+                            </div>
                             <span class="text-slate-400 text-xs block">${perfilMostrar}</span>
                         </div>
                         ${accionesAdminHtml}
@@ -138,9 +179,39 @@
 
                     ${detallesPrivadosHtml}
                 `;
-                listaContenedor.appendChild(card);
+
+                if (enProceso) {
+                    contenedorProceso.appendChild(card);
+                } else {
+                    contenedorCola.appendChild(card);
+                }
             });
+
+            // Mostrar u ocultar el contenedor destacado
+            if (hayAlgunaEnProceso) {
+                seccionProcesoBox.classList.remove('hidden');
+            } else {
+                seccionProcesoBox.classList.add('hidden');
+            }
+
+            if (contenedorCola.children.length === 0 && hayAlgunaEnProceso) {
+                contenedorCola.innerHTML = `<div class="text-center text-slate-500 py-4 text-xs">Todas las solicitudes activas están en proceso.</div>`;
+            }
+
+            idsEnProcesoAnteriores = idsEnProcesoActuales;
         });
+
+        // Cambiar estado "En Proceso"
+        window.cambiarEstadoProceso = async function(id, estado) {
+            if (!esAdmin) return;
+            try {
+                await updateDoc(doc(db, "solicitudes_musica", id), {
+                    enProceso: estado
+                });
+            } catch (e) {
+                console.error("Error al actualizar proceso:", e);
+            }
+        };
 
         // Administrador
         window.abrirModalAdmin = function() {
@@ -373,6 +444,7 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
                     queLeHaceEspecial: document.getElementById('queLeHaceEspecial').value,
                     tonoMensaje: tonoFinal,
                     estiloMusica: estiloFinal,
+                    enProceso: false,
                     creado: Date.now()
                 });
 
@@ -493,7 +565,15 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
             </form>
         </div>
 
-        <!-- LISTA DE SOLICITUDES CON CONTADOR AUTOMÁTICO -->
+        <!-- BLOQUE DESTACADO: EN PROCESO -->
+        <div id="seccionEnProcesoBox" class="space-y-3 pt-2 hidden">
+            <h2 class="text-lg font-bold text-amber-300 flex items-center gap-2">
+                <i class="fa-solid fa-compact-disc text-amber-400 animate-spin"></i> 🟡 En Proceso Actualmente
+            </h2>
+            <div id="listaEnProceso" class="space-y-3"></div>
+        </div>
+
+        <!-- LISTA DE SOLICITUDES EN COLA -->
         <div class="space-y-3 pt-4">
             <h2 class="text-xl font-bold text-amber-400 flex items-center gap-2">
                 <i class="fa-solid fa-list-check"></i> Solicitudes Activas en la Lista <span id="contadorSolicitudes" class="text-amber-300 font-semibold">(0)</span>
