@@ -28,9 +28,7 @@
         let esAdmin = sessionStorage.getItem('is_dj_admin') === 'true';
         let fechaInicioGlobal = "";
         let fechaFinPlazoGlobal = "";
-        let idsEnProcesoAnteriores = new Set();
 
-        // Ocultar parcialmente texto para privacidad (ej: Mayka -> M***a)
         function enmascararTexto(texto) {
             if (!texto) return "***";
             const limpio = texto.trim();
@@ -38,29 +36,23 @@
             return limpio[0] + "***" + limpio[limpio.length - 1];
         }
 
-        // Formato DD/MM/AAAA
         function formatearFechaEsp(fechaStr) {
             if (!fechaStr) return "";
             const partes = fechaStr.split("-");
-            if (partes.length === 3) {
-                return `${partes[2]}/${partes[1]}/${partes[0]}`;
-            }
+            if (partes.length === 3) return `${partes[2]}/${partes[1]}/${partes[0]}`;
             return fechaStr;
         }
 
-        // Sumar N días a una fecha dada
         function sumarDiasAFecha(fechaBaseStr, numDias = 20) {
             const base = fechaBaseStr ? new Date(fechaBaseStr) : new Date();
             base.setDate(base.getDate() + numDias);
             return base.toISOString().split('T')[0];
         }
 
-        // Obtener fecha de hoy en ISO (AAAA-MM-DD)
         function obtenerHoyISO() {
             return new Date().toISOString().split('T')[0];
         }
 
-        // Escuchar configuración global
         onSnapshot(doc(db, "configuracion", "estado_plaza"), (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
@@ -75,50 +67,44 @@
             actualizarInterfaz();
         });
 
-        // Escuchar solicitudes, clasificar "En Proceso" vs "En Cola" y avisar en vivo
+        // Escuchar solicitudes y distribuirlas en las 2 columnas superiores y la cola inferior
         const q = query(collection(db, "solicitudes_musica"), orderBy("creado", "desc"));
         onSnapshot(q, (snapshot) => {
             const contenedorProceso = document.getElementById('listaEnProceso');
+            const contenedorVistas = document.getElementById('listaVistas');
             const contenedorCola = document.getElementById('listaSolicitudes');
             const contadorContenedor = document.getElementById('contadorSolicitudes');
-            const seccionProcesoBox = document.getElementById('seccionEnProcesoBox');
+            const seccionDestacadosDosColumnas = document.getElementById('seccionDestacadosDosColumnas');
             
             contenedorProceso.innerHTML = '';
+            contenedorVistas.innerHTML = '';
             contenedorCola.innerHTML = '';
             
-            const totalSolicitudes = snapshot.size;
-            contadorContenedor.innerText = `(${totalSolicitudes})`;
+            contadorContenedor.innerText = `(${snapshot.size})`;
             
             if (snapshot.empty) {
-                seccionProcesoBox.classList.add('hidden');
+                seccionDestacadosDosColumnas.classList.add('hidden');
                 contenedorCola.innerHTML = `<div class="text-center text-slate-500 py-6 text-sm">No hay solicitudes en la lista por ahora.</div>`;
-                idsEnProcesoAnteriores.clear();
                 return;
             }
 
-            let hayAlgunaEnProceso = false;
-            const idsEnProcesoActuales = new Set();
+            let hayEnProceso = false;
+            let hayVistas = false;
 
             snapshot.forEach((docItem) => {
                 const data = docItem.data();
                 const id = docItem.id;
                 const enProceso = data.enProceso ?? false;
+                const vista = data.vista ?? false;
 
-                if (enProceso) {
-                    hayAlgunaEnProceso = true;
-                    idsEnProcesoActuales.add(id);
-
-                    // Si acaba de pasar a "En Proceso" y no somos el Admin, lanzar aviso emergente
-                    if (!idsEnProcesoAnteriores.has(id) && idsEnProcesoAnteriores.size > 0 && !esAdmin) {
-                        const nombreNotif = enmascararTexto(data.nombre);
-                        alert(`🚀 ¡ATENCIÓN EN DIRECTO!\n\nDJ Spumout ha comenzado a trabajar en la canción de: ${nombreNotif}`);
-                    }
-                }
+                if (enProceso) hayEnProceso = true;
+                if (vista && !enProceso) hayVistas = true;
 
                 const card = document.createElement('div');
                 card.className = enProceso 
-                    ? "bg-amber-950/40 border-2 border-amber-500/80 rounded-xl p-4 space-y-2 shadow-2xl relative animate-pulse"
-                    : "bg-slate-800 border border-slate-700 rounded-xl p-4 space-y-2 shadow-lg relative";
+                    ? "bg-amber-950/40 border-2 border-amber-500/80 rounded-xl p-3.5 space-y-2 shadow-2xl relative animate-pulse"
+                    : (vista ? "bg-sky-950/40 border-2 border-sky-500/80 rounded-xl p-3.5 space-y-2 shadow-xl relative"
+                             : "bg-slate-800 border border-slate-700 rounded-xl p-3.5 space-y-2 shadow-lg relative");
                 
                 let nombreMostrar = esAdmin ? data.nombre : enmascararTexto(data.nombre);
                 let perfilMostrar = esAdmin ? data.perfil : enmascararTexto(data.perfil);
@@ -127,27 +113,36 @@
 
                 if (esAdmin) {
                     const btnProcesoHtml = enProceso 
-                        ? `<button onclick="cambiarEstadoProceso('${id}', false)" class="text-amber-300 bg-amber-900/60 border border-amber-500/60 text-xs px-2.5 py-1 rounded transition flex items-center gap-1 font-bold">
+                        ? `<button onclick="cambiarEstado('${id}', 'enProceso', false)" class="text-amber-300 bg-amber-900/60 border border-amber-500/60 text-[11px] px-2 py-1 rounded transition flex items-center gap-1 font-bold">
                              <i class="fa-solid fa-spinner fa-spin"></i> En Proceso (Quitar)
                            </button>`
-                        : `<button onclick="cambiarEstadoProceso('${id}', true)" class="text-slate-300 hover:text-amber-300 bg-slate-900 border border-slate-700 hover:border-amber-500/50 text-xs px-2.5 py-1 rounded transition flex items-center gap-1">
-                             <i class="fa-solid fa-play"></i> Pasar a En Proceso
+                        : `<button onclick="cambiarEstado('${id}', 'enProceso', true)" class="text-slate-300 hover:text-amber-300 bg-slate-900 border border-slate-700 text-[11px] px-2 py-1 rounded transition flex items-center gap-1">
+                             <i class="fa-solid fa-play"></i> En Proceso
                            </button>`;
 
+                    const btnVistaHtml = vista && !enProceso
+                        ? `<button onclick="cambiarEstado('${id}', 'vista', false)" class="text-sky-300 bg-sky-900/60 border border-sky-500/60 text-[11px] px-2 py-1 rounded transition flex items-center gap-1 font-bold">
+                             <i class="fa-solid fa-eye-slash"></i> Vista (Quitar)
+                           </button>`
+                        : (!enProceso ? `<button onclick="cambiarEstado('${id}', 'vista', true)" class="text-slate-300 hover:text-sky-300 bg-slate-900 border border-slate-700 text-[11px] px-2 py-1 rounded transition flex items-center gap-1">
+                             <i class="fa-solid fa-eye"></i> Marcar Vista
+                           </button>` : '');
+
                     accionesAdminHtml = `
-                        <div class="flex items-center gap-1.5 flex-wrap">
+                        <div class="flex items-center gap-1 flex-wrap">
                             ${btnProcesoHtml}
-                            <button onclick='copiarFichaIA(${JSON.stringify(data)})' class="text-amber-400 hover:text-amber-300 text-xs bg-amber-950/40 border border-amber-800/50 px-2.5 py-1 rounded transition flex items-center gap-1">
-                                <i class="fa-solid fa-copy"></i> Copiar Ficha
+                            ${btnVistaHtml}
+                            <button onclick='copiarFichaIA(${JSON.stringify(data)})' class="text-amber-400 hover:text-amber-300 text-[11px] bg-amber-950/40 border border-amber-800/50 px-2 py-1 rounded transition flex items-center gap-1">
+                                <i class="fa-solid fa-copy"></i>
                             </button>
-                            <button onclick="borrarSolicitud('${id}')" class="text-red-400 hover:text-red-300 text-xs bg-red-950/50 border border-red-800/50 px-2.5 py-1 rounded transition flex items-center gap-1">
-                                <i class="fa-solid fa-trash"></i> Borrar
+                            <button onclick="borrarSolicitud('${id}')" class="text-red-400 hover:text-red-300 text-[11px] bg-red-950/50 border border-red-800/50 px-2 py-1 rounded transition flex items-center gap-1">
+                                <i class="fa-solid fa-trash"></i>
                             </button>
                         </div>`;
 
                     detallesPrivadosHtml = `
-                        <div class="bg-slate-900/90 p-3 rounded-lg border border-amber-500/30 text-xs text-slate-300 space-y-1 mt-2">
-                            <p class="text-amber-400 font-bold border-b border-slate-800 pb-1 mb-1"><i class="fa-solid fa-user-lock mr-1"></i>Detalles Reservados (Solo Admin):</p>
+                        <div class="bg-slate-900/90 p-2.5 rounded-lg border border-amber-500/30 text-[11px] text-slate-300 space-y-1 mt-2">
+                            <p class="text-amber-400 font-bold border-b border-slate-800 pb-1 mb-1"><i class="fa-solid fa-user-lock mr-1"></i>Detalles Reservados (Admin):</p>
                             ${data.estiloMusica ? `<p><strong class="text-slate-200">Estilo:</strong> ${data.estiloMusica} | <strong>Tono:</strong> ${data.tonoMensaje}</p>` : ''}
                             ${data.personalidad ? `<p><strong class="text-slate-200">Carácter:</strong> ${data.personalidad}</p>` : ''}
                             ${data.gustos ? `<p><strong class="text-slate-200">Gustos:</strong> ${data.gustos}</p>` : ''}
@@ -155,26 +150,27 @@
                         </div>`;
                 }
 
-                const etiquetaEstado = enProceso 
-                    ? `<span class="bg-amber-500 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider inline-flex items-center gap-1">
-                         <i class="fa-solid fa-compact-disc animate-spin"></i> Produciendo Ahora
-                       </span>` 
-                    : '';
+                let etiquetaEstado = '';
+                if (enProceso) {
+                    etiquetaEstado = `<span class="bg-amber-500 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider inline-flex items-center gap-1"><i class="fa-solid fa-compact-disc animate-spin"></i> Produciendo</span>`;
+                } else if (vista) {
+                    etiquetaEstado = `<span class="bg-sky-500 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider inline-flex items-center gap-1"><i class="fa-solid fa-check-double"></i> Vista y Anotada</span>`;
+                }
 
                 card.innerHTML = `
-                    <div class="flex justify-between items-start flex-wrap gap-2">
+                    <div class="flex justify-between items-start flex-wrap gap-1.5">
                         <div>
                             <div class="flex items-center gap-2">
-                                <span class="text-amber-400 font-bold text-lg">${nombreMostrar}</span>
+                                <span class="text-amber-400 font-bold text-base">${nombreMostrar}</span>
                                 ${etiquetaEstado}
                             </div>
-                            <span class="text-slate-400 text-xs block">${perfilMostrar}</span>
+                            <span class="text-slate-400 text-[11px] block">${perfilMostrar}</span>
                         </div>
                         ${accionesAdminHtml}
                     </div>
                     
-                    <div class="bg-slate-900/60 p-2.5 rounded-lg border border-slate-700/50 text-xs text-slate-300 mt-2">
-                        <p><strong class="text-amber-400"><i class="fa-solid fa-calendar-day mr-1"></i>Plazo de entrega:</strong> Del ${formatearFechaEsp(data.fechaInicio)} al ${formatearFechaEsp(data.fechaFin)}</p>
+                    <div class="bg-slate-900/60 p-2 rounded-lg border border-slate-700/50 text-[11px] text-slate-300 mt-1.5">
+                        <p><strong class="text-amber-400"><i class="fa-solid fa-calendar-day mr-1"></i>Plazo:</strong> ${formatearFechaEsp(data.fechaInicio)} al ${formatearFechaEsp(data.fechaFin)}</p>
                     </div>
 
                     ${detallesPrivadosHtml}
@@ -182,38 +178,43 @@
 
                 if (enProceso) {
                     contenedorProceso.appendChild(card);
+                } else if (vista) {
+                    contenedorVistas.appendChild(card);
                 } else {
                     contenedorCola.appendChild(card);
                 }
             });
 
-            // Mostrar u ocultar el contenedor destacado
-            if (hayAlgunaEnProceso) {
-                seccionProcesoBox.classList.remove('hidden');
+            // Mostrar u ocultar el bloque superior de 2 columnas
+            if (hayEnProceso || hayVistas) {
+                seccionDestacadosDosColumnas.classList.remove('hidden');
             } else {
-                seccionProcesoBox.classList.add('hidden');
+                seccionDestacadosDosColumnas.classList.add('hidden');
             }
 
-            if (contenedorCola.children.length === 0 && hayAlgunaEnProceso) {
-                contenedorCola.innerHTML = `<div class="text-center text-slate-500 py-4 text-xs">Todas las solicitudes activas están en proceso.</div>`;
+            if (contenedorProceso.children.length === 0) {
+                contenedorProceso.innerHTML = `<div class="text-center text-slate-500 py-3 text-xs italic">Ninguna en producción ahora.</div>`;
             }
-
-            idsEnProcesoAnteriores = idsEnProcesoActuales;
+            if (contenedorVistas.children.length === 0) {
+                contenedorVistas.innerHTML = `<div class="text-center text-slate-500 py-3 text-xs italic">Ninguna marcada como vista.</div>`;
+            }
+            if (contenedorCola.children.length === 0 && (hayEnProceso || hayVistas)) {
+                contenedorCola.innerHTML = `<div class="text-center text-slate-500 py-4 text-xs">Todas las solicitudes están organizadas arriba.</div>`;
+            }
         });
 
-        // Cambiar estado "En Proceso"
-        window.cambiarEstadoProceso = async function(id, estado) {
+        window.cambiarEstado = async function(id, campo, estado) {
             if (!esAdmin) return;
             try {
-                await updateDoc(doc(db, "solicitudes_musica", id), {
-                    enProceso: estado
-                });
-            } catch (e) {
-                console.error("Error al actualizar proceso:", e);
-            }
+                let actualizacion = {};
+                actualizacion[campo] = estado;
+                if (campo === 'enProceso' && estado === true) {
+                    actualizacion['vista'] = false; // Si pasa a proceso, limpia el estado solo vista
+                }
+                await updateDoc(doc(db, "solicitudes_musica", id), actualizacion);
+            } catch (e) { console.error(e); }
         };
 
-        // Administrador
         window.abrirModalAdmin = function() {
             if (esAdmin) {
                 esAdmin = false;
@@ -233,21 +234,16 @@
 
         window.verificarClaveAdmin = function(e) {
             e.preventDefault();
-            const clave = document.getElementById('claveAdminInput').value;
-            if (clave === "spumout2026") {
+            if (document.getElementById('claveAdminInput').value === "spumout2026") {
                 esAdmin = true;
                 sessionStorage.setItem('is_dj_admin', 'true');
                 cerrarModalAdmin();
                 actualizarInterfaz();
-            } else {
-                alert("Contraseña incorrecta.");
-            }
+            } else { alert("Contraseña incorrecta."); }
         };
 
-        // ACCIÓN AL CAMBIAR ESTADO PLAZA (ABRIR / CERRAR)
         window.cambiarEstadoPlaza = async function(nuevoEstado) {
             if (!esAdmin) return;
-            
             if (nuevoEstado) {
                 fechaInicioGlobal = obtenerHoyISO();
                 fechaFinPlazoGlobal = sumarDiasAFecha(fechaInicioGlobal, 20);
@@ -259,7 +255,6 @@
             }
         };
 
-        // AL CAMBIAR LA FECHA DE INICIO
         window.alCambiarFechaInicio = function() {
             const nuevaIni = document.getElementById('inputFechaInicioPanel').value;
             if (nuevaIni) {
@@ -269,23 +264,17 @@
             }
         };
 
-        // AL CAMBIAR LA FECHA FIN A MANO
         window.alCambiarFechaFin = function() {
             const nuevaFin = document.getElementById('inputFechaFinPanel').value;
             const fecha20Sugerida = sumarDiasAFecha(fechaInicioGlobal, 20);
-
             if (nuevaFin !== fecha20Sugerida) {
-                const aceptarCambio = confirm(`ℹ️ Recordatorio de Sistema:\n\nLa referencia automática por defecto es de 20 DÍAS (hasta el ${formatearFechaEsp(fecha20Sugerida)}).\n\n¿Estás seguro de que quieres cambiar manualmente la Fecha de Cierre al ${formatearFechaEsp(nuevaFin)}?`);
-                
-                if (aceptarCambio) {
+                if (confirm(`ℹ️ Recordatorio de Sistema:\n\nLa referencia automática por defecto es de 20 DÍAS (hasta el ${formatearFechaEsp(fecha20Sugerida)}).\n\n¿Quieres fijar manualmente Cierre al ${formatearFechaEsp(nuevaFin)}?`)) {
                     fechaFinPlazoGlobal = nuevaFin;
                 } else {
                     document.getElementById('inputFechaFinPanel').value = fecha20Sugerida;
                     fechaFinPlazoGlobal = fecha20Sugerida;
                 }
-            } else {
-                fechaFinPlazoGlobal = nuevaFin;
-            }
+            } else { fechaFinPlazoGlobal = nuevaFin; }
         };
 
         window.guardarFechasPanel = async function() {
@@ -297,9 +286,7 @@
         async function guardarEstadoPlazaBD(estado, fechaIni, fechaFin) {
             try {
                 await setDoc(doc(db, "configuracion", "estado_plaza"), { 
-                    abierta: estado,
-                    fechaInicio: fechaIni,
-                    fechaFinPlazo: fechaFin 
+                    abierta: estado, fechaInicio: fechaIni, fechaFinPlazo: fechaFin 
                 });
             } catch (e) { console.error(e); }
         }
@@ -374,11 +361,8 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
         window.evaluarOtrosOption = function(selectId, inputContainerId) {
             const selectVal = document.getElementById(selectId).value;
             const container = document.getElementById(inputContainerId);
-            if (selectVal === 'Otros') {
-                container.classList.remove('hidden');
-            } else {
-                container.classList.add('hidden');
-            }
+            if (selectVal === 'Otros') container.classList.remove('hidden');
+            else container.classList.add('hidden');
         };
 
         window.iniciarEnvio = function(e) {
@@ -401,7 +385,6 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
                     clearInterval(intervalo);
                     timerOverlay.classList.remove('flex');
                     timerOverlay.classList.add('hidden');
-                    
                     document.getElementById('modalPlantilla').classList.remove('hidden');
                     document.getElementById('modalPlantilla').classList.add('flex');
                 }
@@ -410,24 +393,18 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
 
         window.guardarTodo = async function(e) {
             e.preventDefault();
-            
             const btn = document.getElementById('btnFinal');
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Guardando...';
             btn.disabled = true;
 
-            const hoy = new Date();
-            const hoyFormatted = hoy.toISOString().split('T')[0];
+            const hoyFormatted = new Date().toISOString().split('T')[0];
             const fechaFinFinal = fechaFinPlazoGlobal || sumarDiasAFecha(fechaInicioGlobal, 20);
 
             let tonoFinal = document.getElementById('tonoMensaje').value;
-            if (tonoFinal === 'Otros') {
-                tonoFinal = document.getElementById('inputTonoOtro').value || 'Otros';
-            }
+            if (tonoFinal === 'Otros') tonoFinal = document.getElementById('inputTonoOtro').value || 'Otros';
 
             let estiloFinal = document.getElementById('estiloMusica').value;
-            if (estiloFinal === 'Otros') {
-                estiloFinal = document.getElementById('inputEstiloOtro').value || 'Otros';
-            }
+            if (estiloFinal === 'Otros') estiloFinal = document.getElementById('inputEstiloOtro').value || 'Otros';
 
             try {
                 await addDoc(collection(db, "solicitudes_musica"), {
@@ -445,6 +422,7 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
                     tonoMensaje: tonoFinal,
                     estiloMusica: estiloFinal,
                     enProceso: false,
+                    vista: false,
                     creado: Date.now()
                 });
 
@@ -464,23 +442,19 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
 </head>
 <body class="bg-slate-900 text-white min-h-screen p-4 md:p-8 font-sans relative pb-20">
 
-    <!-- CROWN DE ADMIN -->
     <div id="adminBadge" class="hidden fixed top-3 right-3 bg-amber-500/20 border border-amber-500/50 text-amber-300 px-3 py-1.5 rounded-full text-xs font-bold shadow-lg flex items-center gap-1.5 z-30">
         <i class="fa-solid fa-crown text-amber-400 animate-bounce"></i> Modo Administrador Activo
     </div>
 
-    <!-- BOTÓN MODO ADMIN -->
     <button id="btnVolverAdmin" onclick="abrirModalAdmin()" class="fixed top-3 right-3 bg-slate-800/90 border border-amber-500/40 text-amber-400 px-3 py-1.5 rounded-full text-xs font-bold shadow-lg flex items-center gap-1.5 z-30 hover:bg-slate-700 transition">
         <i class="fa-solid fa-crown"></i> Acceso Admin
     </button>
 
-    <div class="max-w-2xl mx-auto space-y-6">
+    <div class="max-w-4xl mx-auto space-y-6">
         
-        <!-- Header -->
         <header class="text-center space-y-3">
             <h1 class="text-3xl font-bold text-amber-400"><i class="fa-solid fa-music mr-2"></i>Lista Música de IA</h1>
             
-            <!-- BOTONES SUPERIORES -->
             <div class="flex items-center justify-center gap-2.5 pt-1 flex-wrap">
                 <a href="https://www.tiktok.com/@djspumout?_r=1&_t=ZN-9AdBdXYWWDm" target="_blank" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-1.5 rounded-full text-xs font-semibold transition flex items-center gap-2 shadow hover:border-amber-400">
                     <i class="fa-brands fa-tiktok text-amber-400"></i> Mi TikTok
@@ -497,7 +471,6 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
                 Cargando estado...
             </div>
 
-            <!-- PANEL DE CONTROL DJ CON DOBLE CALENDARIO -->
             <div id="adminPanel" class="hidden bg-slate-800/90 border border-amber-500/40 p-4 rounded-xl space-y-4 shadow-inner mt-2">
                 <div class="flex items-center justify-between border-b border-slate-700/60 pb-2">
                     <span class="text-xs text-amber-400 font-bold flex items-center gap-1"><i class="fa-solid fa-crown"></i> Panel DJ Spumout</span>
@@ -516,7 +489,6 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
                         </button>
                     </div>
 
-                    <!-- CONTROLES DE FECHA INICIO Y FIN -->
                     <div class="flex flex-wrap items-center gap-2 bg-slate-900/90 p-2 rounded-lg border border-slate-700 text-xs w-full md:w-auto justify-center">
                         <div class="flex items-center gap-1">
                             <label class="text-slate-400">Inicio:</label>
@@ -534,15 +506,13 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
             </div>
         </header>
 
-        <!-- AVISO CERRADO -->
         <div id="alertClosed" class="bg-slate-800/80 border border-slate-700 p-6 rounded-xl text-center space-y-2 hidden">
             <i class="fa-solid fa-lock text-3xl text-red-400 mb-1 block"></i>
             <h3 class="text-lg font-bold text-slate-200">Plazas actualmente cerradas</h3>
             <p class="text-xs text-slate-400">Permanece atento al directo de DJ Spumout para saber cuándo abre la próxima plaza.</p>
         </div>
 
-        <!-- FORMULARIO PASO 1 -->
-        <div id="formPaso1Container" class="hidden">
+        <div id="formPaso1Container" class="hidden max-w-xl mx-auto">
             <form id="musicFormPaso1" onsubmit="iniciarEnvio(event)" class="bg-slate-800 p-6 rounded-xl border border-slate-700 space-y-4 shadow-2xl">
                 <div>
                     <label class="block text-xs text-slate-300 mb-1">Tu Usuario / Perfil de TikTok *</label>
@@ -565,18 +535,29 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
             </form>
         </div>
 
-        <!-- BLOQUE DESTACADO: EN PROCESO -->
-        <div id="seccionEnProcesoBox" class="space-y-3 pt-2 hidden">
-            <h2 class="text-lg font-bold text-amber-300 flex items-center gap-2">
-                <i class="fa-solid fa-compact-disc text-amber-400 animate-spin"></i> 🟡 En Proceso Actualmente
-            </h2>
-            <div id="listaEnProceso" class="space-y-3"></div>
+        <!-- SECCIÓN SUPERIOR DIVIDIDA EN 2 COLUMNAS A LA MITAD -->
+        <div id="seccionDestacadosDosColumnas" class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 hidden">
+            <!-- COLUMNA IZQUIERDA: EN PROCESO -->
+            <div class="space-y-2 bg-slate-900/40 p-3.5 rounded-xl border border-amber-500/30">
+                <h2 class="text-base font-bold text-amber-300 flex items-center gap-2 border-b border-amber-500/20 pb-2">
+                    <i class="fa-solid fa-compact-disc text-amber-400 animate-spin"></i> 🟡 En Proceso Currently
+                </h2>
+                <div id="listaEnProceso" class="space-y-3"></div>
+            </div>
+
+            <!-- COLUMNA DERECHA: VISTAS Y ACEPTADAS -->
+            <div class="space-y-2 bg-slate-900/40 p-3.5 rounded-xl border border-sky-500/30">
+                <h2 class="text-base font-bold text-sky-300 flex items-center gap-2 border-b border-sky-500/20 pb-2">
+                    <i class="fa-solid fa-circle-check text-sky-400"></i> 👀 Vistas y Aceptadas
+                </h2>
+                <div id="listaVistas" class="space-y-3"></div>
+            </div>
         </div>
 
-        <!-- LISTA DE SOLICITUDES EN COLA -->
+        <!-- LISTA INFERIOR DE SOLICITUDES EN COLA -->
         <div class="space-y-3 pt-4">
-            <h2 class="text-xl font-bold text-amber-400 flex items-center gap-2">
-                <i class="fa-solid fa-list-check"></i> Solicitudes Activas en la Lista <span id="contadorSolicitudes" class="text-amber-300 font-semibold">(0)</span>
+            <h2 class="text-lg font-bold text-amber-400 flex items-center gap-2 border-b border-slate-800 pb-2">
+                <i class="fa-solid fa-list-check"></i> Solicitudes en Cola <span id="contadorSolicitudes" class="text-amber-300 font-semibold">(0)</span>
             </h2>
             <div id="listaSolicitudes" class="space-y-3">
                 <div class="text-center text-slate-500 py-6">Cargando lista de solicitudes...</div>
@@ -589,12 +570,10 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
     <div id="modalInfoSpumout" onclick="if(event.target === this) this.classList.add('hidden')" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden justify-center items-center z-50 p-4">
         <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-lg w-full space-y-4 shadow-2xl relative my-8">
             <button onclick="document.getElementById('modalInfoSpumout').classList.add('hidden')" class="absolute top-3 right-3 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
-            
             <div class="text-center space-y-1 border-b border-slate-700 pb-3">
                 <h3 class="text-amber-400 font-bold text-lg flex items-center justify-center gap-2"><i class="fa-solid fa-compact-disc text-amber-400 animate-spin"></i> DJ Spumout</h3>
                 <p class="text-xs text-slate-400">Director en Dos Hermanas, España</p>
             </div>
-
             <div class="text-xs text-slate-300 space-y-3 leading-relaxed max-h-[60vh] overflow-y-auto pr-2">
                 <p>Hola, soy <strong>DJ Spumout</strong>.</p>
                 <p>Soy DJ, técnico de sonido y productor. Mi objetivo es claro: crear momentos únicos, hacer que la gente disfrute y conectar a través de la música.</p>
@@ -606,7 +585,6 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
                 <p>Puedes encontrarme en TikTok, Twitch y otras redes sociales, donde también hago directos y comparto mi trabajo.</p>
                 <p class="text-amber-400 font-bold text-center">Gracias por estar aquí 🙌</p>
             </div>
-
             <button onclick="document.getElementById('modalInfoSpumout').classList.add('hidden')" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-2 rounded text-xs transition">Entendido</button>
         </div>
     </div>
@@ -638,16 +616,12 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
     <!-- MODAL PLANTILLA EMERGENTE -->
     <div id="modalPlantilla" onclick="if(event.target === this) document.getElementById('modalPlantilla').classList.add('hidden')" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md hidden justify-center items-center z-40 p-4 overflow-y-auto">
         <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-2xl w-full my-8 space-y-6 shadow-2xl relative">
-            
             <button onclick="document.getElementById('modalPlantilla').classList.add('hidden')" class="absolute top-4 right-4 text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
-
             <div class="text-center border-b border-slate-700 pb-4">
                 <h2 class="text-2xl font-bold text-amber-400"><i class="fa-solid fa-sliders mr-2"></i>Personaliza la Canción</h2>
                 <p class="text-xs text-slate-400 mt-1">Rellena esta ficha para que la canción quede perfecta</p>
             </div>
-
             <form onsubmit="guardarTodo(event)" class="space-y-4 text-sm max-h-[70vh] overflow-y-auto pr-2">
-                
                 <div class="space-y-3">
                     <h3 class="font-bold text-amber-400 flex items-center gap-2"><i class="fa-solid fa-user"></i> 1. Básico</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -655,23 +629,19 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
                         <input type="text" id="relacion" placeholder="Relación (Hijo, Tío, Amigo...)" class="bg-slate-900 border border-slate-700 rounded p-2 text-white">
                     </div>
                 </div>
-
                 <div class="space-y-3 border-t border-slate-700 pt-3">
                     <h3 class="font-bold text-amber-400 flex items-center gap-2"><i class="fa-solid fa-masks-theater"></i> 2. Personalidad</h3>
                     <input type="text" id="personalidad" placeholder="¿Cómo es? (Gracioso, trabajador, rebelde...)" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
                     <input type="text" id="gustos" placeholder="¿Qué le gusta? (Fútbol, coches, flamenco...)" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
                     <input type="text" id="fraseTipica" placeholder="Frase típica que siempre dice..." class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
                 </div>
-
                 <div class="space-y-3 border-t border-slate-700 pt-3">
                     <h3 class="font-bold text-amber-400 flex items-center gap-2"><i class="fa-solid fa-book-bookmark"></i> 3. Recuerdos</h3>
                     <textarea id="anecdota" placeholder="Anécdota especial con la familia..." class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white" rows="2"></textarea>
                     <input type="text" id="queLeHaceEspecial" placeholder="¿Qué le hace único / especial?" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
                 </div>
-
                 <div class="space-y-3 border-t border-slate-700 pt-3">
                     <h3 class="font-bold text-amber-400 flex items-center gap-2"><i class="fa-solid fa-heart"></i> 4. Intención y Estilo</h3>
-                    
                     <div>
                         <select id="tonoMensaje" onchange="evaluarOtrosOption('tonoMensaje', 'containerTonoOtro')" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
                             <option value="Emocionar ❤️">Emocionar ❤️</option>
@@ -683,7 +653,6 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
                             <input type="text" id="inputTonoOtro" placeholder="Escribe la intención o mensaje..." class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
                         </div>
                     </div>
-
                     <div>
                         <select id="estiloMusica" onchange="evaluarOtrosOption('estiloMusica', 'containerEstiloOtro')" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
                             <option value="Flamenco Moderno">Flamenco Moderno</option>
@@ -701,12 +670,10 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
                         </div>
                     </div>
                 </div>
-
                 <button id="btnFinal" type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 rounded-lg transition duration-200 mt-4 text-base">
                     Confirmar y Enviar Solicitud
                 </button>
             </form>
-
         </div>
     </div>
 
