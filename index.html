@@ -88,32 +88,22 @@
             const contenedorProceso = document.getElementById('listaEnProceso');
             const contenedorVistas = document.getElementById('listaVistas');
             const contenedorCompletadas = document.getElementById('listaCompletadas');
+            const contenedorColaPublica = document.getElementById('listaSolicitudesCola');
             const contenedorMisSolicitudes = document.getElementById('listaMisSolicitudes');
-            const contenedorColaAdmin = document.getElementById('listaSolicitudesAdmin');
             const contadorContenedor = document.getElementById('contadorSolicitudes');
-            const seccionDestacados = document.getElementById('seccionDestacadosDosColumnas');
-            const bloqueCliente = document.getElementById('bloqueClientePrivado');
-            const bloqueAdmin = document.getElementById('bloqueAdminCola');
+            const seccionDestacados = document.getElementById('seccionDestacadosTresColumnas');
             
             contenedorProceso.innerHTML = '';
             contenedorVistas.innerHTML = '';
             contenedorCompletadas.innerHTML = '';
+            contenedorColaPublica.innerHTML = '';
             contenedorMisSolicitudes.innerHTML = '';
-            contenedorColaAdmin.innerHTML = '';
 
             let hayEnProceso = false;
             let hayVistas = false;
             let hayCompletadas = false;
-            let totalEnColaAdmin = 0;
+            let totalEnCola = 0;
             let misSolicitudesCount = 0;
-
-            if (esAdmin) {
-                bloqueCliente.classList.add('hidden');
-                bloqueAdmin.classList.remove('hidden');
-            } else {
-                bloqueCliente.classList.remove('hidden');
-                bloqueAdmin.classList.add('hidden');
-            }
 
             snapshotActual.forEach((docItem) => {
                 const data = docItem.data();
@@ -126,9 +116,9 @@
                 if (enProceso) hayEnProceso = true;
                 if (vista && !enProceso && !completada) hayVistas = true;
                 if (completada) hayCompletadas = true;
-                if (!enProceso && !vista && !completada) totalEnColaAdmin++;
+                if (!enProceso && !vista && !completada) totalEnCola++;
 
-                // 1. VISTA PÚBLICA (Listas dinámicas compartidas)
+                // 1. CLASIFICACIÓN PÚBLICA (Nombres enmascarados para los usuarios)
                 if (enProceso || vista || completada) {
                     const cardPublica = document.createElement('div');
                     cardPublica.className = enProceso 
@@ -157,10 +147,62 @@
                     if (enProceso) contenedorProceso.appendChild(cardPublica);
                     else if (completada) contenedorCompletadas.appendChild(cardPublica);
                     else if (vista) contenedorVistas.appendChild(cardPublica);
+                } else {
+                    // Tarjeta para la lista 'Solicitudes en Cola'
+                    const cardCola = document.createElement('div');
+                    cardCola.className = "bg-slate-800 border border-slate-700 rounded-xl p-3.5 space-y-2 shadow-lg relative";
+
+                    const nombreMostrar = esAdmin ? data.nombre : enmascararTexto(data.nombre);
+                    const perfilMostrar = esAdmin ? data.perfil : enmascararTexto(data.perfil);
+
+                    let accionesAdminHtml = '';
+                    let detallesPrivadosHtml = '';
+
+                    if (esAdmin) {
+                        accionesAdminHtml = `
+                            <div class="flex items-center gap-1 flex-wrap">
+                                <button onclick="cambiarEstado('${id}', 'enProceso', true)" class="text-slate-300 hover:text-amber-300 bg-slate-900 border border-slate-700 text-[11px] px-2 py-1 rounded">
+                                    <i class="fa-solid fa-play"></i> En Proceso
+                                </button>
+                                <button onclick="cambiarEstado('${id}', 'vista', true)" class="text-slate-300 hover:text-sky-300 bg-slate-900 border border-slate-700 text-[11px] px-2 py-1 rounded">
+                                    <i class="fa-solid fa-eye"></i> Marcar Vista
+                                </button>
+                                <button onclick='copiarFichaIA(${JSON.stringify(data)})' class="text-amber-400 hover:text-amber-300 text-[11px] bg-amber-950/40 border border-amber-800/50 px-2 py-1 rounded">
+                                    <i class="fa-solid fa-copy"></i>
+                                </button>
+                                <button onclick="borrarSolicitud('${id}')" class="text-red-400 hover:text-red-300 text-[11px] bg-red-950/50 border border-red-800/50 px-2 py-1 rounded">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>`;
+
+                        detallesPrivadosHtml = `
+                            <div class="bg-slate-900/90 p-2.5 rounded-lg border border-amber-500/30 text-[11px] text-slate-300 space-y-1 mt-2">
+                                <p class="text-amber-400 font-bold border-b border-slate-800 pb-1 mb-1"><i class="fa-solid fa-user-lock mr-1"></i>Detalles Reservados (Admin):</p>
+                                ${data.estiloMusica ? `<p><strong class="text-slate-200">Estilo:</strong> ${data.estiloMusica} | <strong>Tono:</strong> ${data.tonoMensaje}</p>` : ''}
+                                ${data.personalidad ? `<p><strong class="text-slate-200">Carácter:</strong> ${data.personalidad}</p>` : ''}
+                                ${data.gustos ? `<p><strong class="text-slate-200">Gustos:</strong> ${data.gustos}</p>` : ''}
+                                ${data.anecdota ? `<p><strong class="text-slate-200">Anécdota:</strong> ${data.anecdota}</p>` : ''}
+                            </div>`;
+                    }
+
+                    cardCola.innerHTML = `
+                        <div class="flex justify-between items-start flex-wrap gap-1.5">
+                            <div>
+                                <span class="text-amber-400 font-bold text-base">${nombreMostrar}</span>
+                                <span class="text-slate-400 text-[11px] block">${perfilMostrar}</span>
+                            </div>
+                            ${accionesAdminHtml}
+                        </div>
+                        <div class="bg-slate-900/60 p-2 rounded-lg border border-slate-700/50 text-[11px] text-slate-300 mt-1.5">
+                            <p><strong class="text-amber-400"><i class="fa-solid fa-calendar-day mr-1"></i>Plazo:</strong> ${formatearFechaEsp(data.fechaInicio)} al ${formatearFechaEsp(data.fechaFin)}</p>
+                        </div>
+                        ${detallesPrivadosHtml}
+                    `;
+                    contenedorColaPublica.appendChild(cardCola);
                 }
 
-                // 2. VISTA PRIVADA DEL CLIENTE (Solo ve su petición)
-                if (!esAdmin && esMio) {
+                // 2. VISTA PRIVADA INDIVIDUAL DEL CLIENTE
+                if (esMio) {
                     misSolicitudesCount++;
                     const cardCliente = document.createElement('div');
                     cardCliente.className = "bg-slate-800 border border-amber-500/50 rounded-xl p-4 space-y-3 shadow-xl";
@@ -192,71 +234,12 @@
                     `;
                     contenedorMisSolicitudes.appendChild(cardCliente);
                 }
-
-                // 3. VISTA COMPLETA DE ADMINISTRACIÓN
-                if (esAdmin) {
-                    const cardAdmin = document.createElement('div');
-                    cardAdmin.className = enProceso 
-                        ? "bg-amber-950/40 border-2 border-amber-500/80 rounded-xl p-3.5 space-y-2 shadow-2xl"
-                        : (completada ? "bg-green-950/40 border-2 border-green-500/80 rounded-xl p-3.5 space-y-2 shadow-xl"
-                                     : (vista ? "bg-sky-950/40 border-2 border-sky-500/80 rounded-xl p-3.5 space-y-2 shadow-xl"
-                                              : "bg-slate-800 border border-slate-700 rounded-xl p-3.5 space-y-2 shadow-lg"));
-
-                    const btnProcesoHtml = enProceso 
-                        ? `<button onclick="completarCancion('${id}')" class="text-green-300 bg-green-900/60 border border-green-500/60 text-[11px] px-2 py-1 rounded font-bold">
-                             <i class="fa-solid fa-check"></i> ✅ Completar
-                           </button>
-                           <button onclick="cambiarEstado('${id}', 'enProceso', false)" class="text-amber-300 bg-amber-900/60 border border-amber-500/60 text-[11px] px-2 py-1 rounded font-bold">
-                             <i class="fa-solid fa-undo"></i> Quitar de Proceso
-                           </button>`
-                        : `<button onclick="cambiarEstado('${id}', 'enProceso', true)" class="text-slate-300 hover:text-amber-300 bg-slate-900 border border-slate-700 text-[11px] px-2 py-1 rounded">
-                             <i class="fa-solid fa-play"></i> En Proceso
-                           </button>`;
-
-                    const btnVistaHtml = vista && !enProceso && !completada
-                        ? `<button onclick="cambiarEstado('${id}', 'vista', false)" class="text-sky-300 bg-sky-900/60 border border-sky-500/60 text-[11px] px-2 py-1 rounded font-bold">
-                             <i class="fa-solid fa-eye-slash"></i> Vista (Quitar)
-                           </button>`
-                        : (!enProceso && !completada ? `<button onclick="cambiarEstado('${id}', 'vista', true)" class="text-slate-300 hover:text-sky-300 bg-slate-900 border border-slate-700 text-[11px] px-2 py-1 rounded">
-                             <i class="fa-solid fa-eye"></i> Marcar Vista
-                           </button>` : '');
-
-                    cardAdmin.innerHTML = `
-                        <div class="flex justify-between items-start flex-wrap gap-1.5">
-                            <div>
-                                <span class="text-amber-400 font-bold text-base">${data.nombre}</span>
-                                <span class="text-slate-400 text-[11px] block">${data.perfil}</span>
-                            </div>
-                            <div class="flex items-center gap-1 flex-wrap">
-                                ${btnProcesoHtml}
-                                ${btnVistaHtml}
-                                <button onclick="agregarEnlaceDescarga('${id}')" class="text-green-400 hover:text-green-300 text-[11px] bg-green-950/50 border border-green-800/50 px-2 py-1 rounded">
-                                    <i class="fa-solid fa-link"></i> Link Descarga
-                                </button>
-                                <button onclick='copiarFichaIA(${JSON.stringify(data)})' class="text-amber-400 hover:text-amber-300 text-[11px] bg-amber-950/40 border border-amber-800/50 px-2 py-1 rounded">
-                                    <i class="fa-solid fa-copy"></i>
-                                </button>
-                                <button onclick="borrarSolicitud('${id}')" class="text-red-400 hover:text-red-300 text-[11px] bg-red-950/50 border border-red-800/50 px-2 py-1 rounded">
-                                    <i class="fa-solid fa-trash"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="bg-slate-900/90 p-2.5 rounded-lg border border-amber-500/30 text-[11px] text-slate-300 space-y-1 mt-2">
-                            <p class="text-amber-400 font-bold border-b border-slate-800 pb-1 mb-1"><i class="fa-solid fa-user-lock mr-1"></i>Detalles Reservados (Admin):</p>
-                            ${data.estiloMusica ? `<p><strong class="text-slate-200">Estilo:</strong> ${data.estiloMusica} | <strong>Tono:</strong> ${data.tonoMensaje}</p>` : ''}
-                            ${data.personalidad ? `<p><strong class="text-slate-200">Carácter:</strong> ${data.personalidad}</p>` : ''}
-                            ${data.gustos ? `<p><strong class="text-slate-200">Gustos:</strong> ${data.gustos}</p>` : ''}
-                            ${data.anecdota ? `<p><strong class="text-slate-200">Anécdota:</strong> ${data.anecdota}</p>` : ''}
-                            ${data.downloadUrl ? `<p class="text-green-400 truncate"><strong class="text-slate-200">Link activo:</strong> ${data.downloadUrl}</p>` : ''}
-                        </div>
-                    `;
-                    contenedorColaAdmin.appendChild(cardAdmin);
-                }
             });
 
-            // Actualizar contador del título "Solicitudes en Cola (X)"
-            contadorContenedor.innerText = `(${totalEnColaAdmin})`;
+            // Actualizar el contador dinámico en el título "(X)"
+            if (contadorContenedor) {
+                contadorContenedor.innerText = `(${totalEnCola})`;
+            }
 
             if (hayEnProceso || hayVistas || hayCompletadas) {
                 seccionDestacados.classList.remove('hidden');
@@ -273,11 +256,11 @@
             if (contenedorCompletadas.children.length === 0) {
                 contenedorCompletadas.innerHTML = `<div class="text-center text-slate-500 py-3 text-xs italic">Ninguna canción completada aún.</div>`;
             }
-            if (!esAdmin && misSolicitudesCount === 0) {
-                contenedorMisSolicitudes.innerHTML = `<div class="text-center text-slate-500 py-6 text-xs">No tienes ninguna solicitud enviada por ahora.</div>`;
+            if (contenedorColaPublica.children.length === 0) {
+                contenedorColaPublica.innerHTML = `<div class="text-center text-slate-500 py-6 text-xs">No hay solicitudes pendientes en la cola.</div>`;
             }
-            if (esAdmin && contenedorColaAdmin.children.length === 0) {
-                contenedorColaAdmin.innerHTML = `<div class="text-center text-slate-500 py-6 text-xs">No hay solicitudes registradas en la base de datos.</div>`;
+            if (misSolicitudesCount === 0) {
+                contenedorMisSolicitudes.innerHTML = `<div class="text-center text-slate-500 py-6 text-xs">No tienes ninguna solicitud enviada por ahora.</div>`;
             }
         }
 
@@ -292,7 +275,7 @@
                         completada: true,
                         downloadUrl: url.trim()
                     });
-                    alert("¡Canción completada y movida a la lista de listas para descargar!");
+                    alert("¡Canción completada y movida a la lista de canciones completadas!");
                 } catch (e) { console.error(e); }
             }
         };
@@ -346,7 +329,7 @@
                 sessionStorage.setItem('is_dj_admin', 'true');
                 cerrarModalAdmin();
                 actualizarInterfaz();
-                renderizarListas(); // Renderiza al instante sin recargar la página
+                renderizarListas();
             } else { alert("Contraseña incorrecta."); }
         };
 
@@ -647,50 +630,50 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
             </form>
         </div>
 
-        <!-- SECCIÓN DE ESTADOS PÚBLICOS (Dividida en 3 bloques dinámicos) -->
-        <div id="seccionDestacadosDosColumnas" class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 hidden">
-            <!-- BLOQUE 1: EN PROCESO -->
+        <!-- SECCIÓN DE ESTADOS DESTACADOS (3 COLUMNAS SUPERIORES) -->
+        <div id="seccionDestacadosTresColumnas" class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 hidden">
+            <!-- 1. EN PROCESO -->
             <div class="space-y-2 bg-slate-900/40 p-3.5 rounded-xl border border-amber-500/30">
-                <h2 class="text-sm font-bold text-amber-300 flex items-center gap-1.5 border-b border-amber-500/20 pb-2">
+                <h2 class="text-xs font-bold text-amber-300 flex items-center gap-1.5 border-b border-amber-500/20 pb-2 uppercase tracking-wider">
                     <i class="fa-solid fa-compact-disc text-amber-400 animate-spin"></i> 🟡 En Proceso Actualmente
                 </h2>
                 <div id="listaEnProceso" class="space-y-3"></div>
             </div>
 
-            <!-- BLOQUE 2: VISTAS Y ACEPTADAS -->
+            <!-- 2. VISTAS Y ACEPTADAS -->
             <div class="space-y-2 bg-slate-900/40 p-3.5 rounded-xl border border-sky-500/30">
-                <h2 class="text-sm font-bold text-sky-300 flex items-center gap-1.5 border-b border-sky-500/20 pb-2">
+                <h2 class="text-xs font-bold text-sky-300 flex items-center gap-1.5 border-b border-sky-500/20 pb-2 uppercase tracking-wider">
                     <i class="fa-solid fa-circle-check text-sky-400"></i> 👀 Vistas y Aceptadas
                 </h2>
                 <div id="listaVistas" class="space-y-3"></div>
             </div>
 
-            <!-- BLOQUE 3: CANCIONES COMPLETADAS -->
+            <!-- 3. CANCIONES COMPLETADAS -->
             <div class="space-y-2 bg-slate-900/40 p-3.5 rounded-xl border border-green-500/30">
-                <h2 class="text-sm font-bold text-green-300 flex items-center gap-1.5 border-b border-green-500/20 pb-2">
+                <h2 class="text-xs font-bold text-green-300 flex items-center gap-1.5 border-b border-green-500/20 pb-2 uppercase tracking-wider">
                     <i class="fa-solid fa-circle-play text-green-400"></i> 🎉 Canciones Completadas
                 </h2>
                 <div id="listaCompletadas" class="space-y-3"></div>
             </div>
         </div>
 
-        <!-- BLOQUE VISTA CLIENTE PRIVADO -->
-        <div id="bloqueClientePrivado" class="space-y-3 pt-4">
+        <!-- 4. LISTA GENERAL DE SOLICITUDES EN COLA CON CONTADOR DINÁMICO -->
+        <div class="space-y-3 pt-4">
+            <h2 class="text-lg font-bold text-amber-400 flex items-center gap-2 border-b border-slate-800 pb-2">
+                <i class="fa-solid fa-list-check"></i> Solicitudes en Cola <span id="contadorSolicitudes" class="text-amber-300 font-semibold">(0)</span>
+            </h2>
+            <div id="listaSolicitudesCola" class="space-y-3">
+                <div class="text-center text-slate-500 py-6">Cargando cola de solicitudes...</div>
+            </div>
+        </div>
+
+        <!-- BLOQUE VISTA CLIENTE PRIVADO INDIVIDUAL -->
+        <div id="bloqueClientePrivado" class="space-y-3 pt-6 border-t border-slate-800">
             <h2 class="text-lg font-bold text-amber-400 flex items-center gap-2 border-b border-slate-800 pb-2">
                 <i class="fa-solid fa-user-gear"></i> Mi Solicitud Privada
             </h2>
             <div id="listaMisSolicitudes" class="space-y-3">
                 <div class="text-center text-slate-500 py-6">Cargando tus datos...</div>
-            </div>
-        </div>
-
-        <!-- BLOQUE VISTA ADMINISTRADOR COMPLETA -->
-        <div id="bloqueAdminCola" class="space-y-3 pt-4 hidden">
-            <h2 class="text-lg font-bold text-amber-400 flex items-center gap-2 border-b border-slate-800 pb-2">
-                <i class="fa-solid fa-list-check"></i> Solicitudes en Cola <span id="contadorSolicitudes" class="text-amber-300 font-semibold">(0)</span>
-            </h2>
-            <div id="listaSolicitudesAdmin" class="space-y-3">
-                <div class="text-center text-slate-500 py-6">Cargando base de datos completa...</div>
             </div>
         </div>
 
