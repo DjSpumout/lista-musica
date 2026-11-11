@@ -35,6 +35,7 @@
         let esAdmin = sessionStorage.getItem('is_dj_admin') === 'true';
         let fechaInicioGlobal = "";
         let fechaFinPlazoGlobal = "";
+        let snapshotActual = null;
 
         function enmascararTexto(texto) {
             if (!texto) return "***";
@@ -74,11 +75,19 @@
             actualizarInterfaz();
         });
 
-        // Cargar solicitudes con reglas de privacidad
+        // Escuchar base de datos en tiempo real
         const q = query(collection(db, "solicitudes_musica"), orderBy("creado", "desc"));
         onSnapshot(q, (snapshot) => {
+            snapshotActual = snapshot;
+            renderizarListas();
+        });
+
+        function renderizarListas() {
+            if (!snapshotActual) return;
+
             const contenedorProceso = document.getElementById('listaEnProceso');
             const contenedorVistas = document.getElementById('listaVistas');
+            const contenedorCompletadas = document.getElementById('listaCompletadas');
             const contenedorMisSolicitudes = document.getElementById('listaMisSolicitudes');
             const contenedorColaAdmin = document.getElementById('listaSolicitudesAdmin');
             const contadorContenedor = document.getElementById('contadorSolicitudes');
@@ -88,11 +97,13 @@
             
             contenedorProceso.innerHTML = '';
             contenedorVistas.innerHTML = '';
+            contenedorCompletadas.innerHTML = '';
             contenedorMisSolicitudes.innerHTML = '';
             contenedorColaAdmin.innerHTML = '';
 
             let hayEnProceso = false;
             let hayVistas = false;
+            let hayCompletadas = false;
             let totalEnColaAdmin = 0;
             let misSolicitudesCount = 0;
 
@@ -104,28 +115,36 @@
                 bloqueAdmin.classList.add('hidden');
             }
 
-            snapshot.forEach((docItem) => {
+            snapshotActual.forEach((docItem) => {
                 const data = docItem.data();
                 const id = docItem.id;
                 const enProceso = data.enProceso ?? false;
                 const vista = data.vista ?? false;
+                const completada = data.completada ?? false;
                 const esMio = data.clientId === clientId;
 
                 if (enProceso) hayEnProceso = true;
-                if (vista && !enProceso) hayVistas = true;
-                if (!enProceso && !vista) totalEnColaAdmin++;
+                if (vista && !enProceso && !completada) hayVistas = true;
+                if (completada) hayCompletadas = true;
+                if (!enProceso && !vista && !completada) totalEnColaAdmin++;
 
-                // 1. Renderizar en columnas de estado públicas (nombres siempre enmascarados)
-                if (enProceso || vista) {
+                // 1. VISTA PÚBLICA (Listas dinámicas compartidas)
+                if (enProceso || vista || completada) {
                     const cardPublica = document.createElement('div');
                     cardPublica.className = enProceso 
                         ? "bg-amber-950/40 border-2 border-amber-500/80 rounded-xl p-3.5 space-y-2 shadow-2xl animate-pulse"
-                        : "bg-sky-950/40 border-2 border-sky-500/80 rounded-xl p-3.5 space-y-2 shadow-xl";
+                        : (completada ? "bg-green-950/40 border-2 border-green-500/80 rounded-xl p-3.5 space-y-2 shadow-xl"
+                                     : "bg-sky-950/40 border-2 border-sky-500/80 rounded-xl p-3.5 space-y-2 shadow-xl");
                     
                     const nombrePublico = esAdmin ? data.nombre : enmascararTexto(data.nombre);
-                    let badgePublico = enProceso 
-                        ? `<span class="bg-amber-500 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider inline-flex items-center gap-1"><i class="fa-solid fa-compact-disc animate-spin"></i> Produciendo</span>`
-                        : `<span class="bg-sky-500 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider inline-flex items-center gap-1"><i class="fa-solid fa-check-double"></i> Vista y Anotada</span>`;
+                    let badgePublico = '';
+                    if (enProceso) {
+                        badgePublico = `<span class="bg-amber-500 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider inline-flex items-center gap-1"><i class="fa-solid fa-compact-disc animate-spin"></i> Produciendo</span>`;
+                    } else if (completada) {
+                        badgePublico = `<span class="bg-green-500 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider inline-flex items-center gap-1"><i class="fa-solid fa-check"></i> Lista</span>`;
+                    } else if (vista) {
+                        badgePublico = `<span class="bg-sky-500 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider inline-flex items-center gap-1"><i class="fa-solid fa-check-double"></i> Vista y Anotada</span>`;
+                    }
 
                     cardPublica.innerHTML = `
                         <div class="flex justify-between items-center">
@@ -136,10 +155,11 @@
                     `;
 
                     if (enProceso) contenedorProceso.appendChild(cardPublica);
+                    else if (completada) contenedorCompletadas.appendChild(cardPublica);
                     else if (vista) contenedorVistas.appendChild(cardPublica);
                 }
 
-                // 2. Renderizar para Cliente Privado (Solo ve sus propias canciones)
+                // 2. VISTA PRIVADA DEL CLIENTE (Solo ve su petición)
                 if (!esAdmin && esMio) {
                     misSolicitudesCount++;
                     const cardCliente = document.createElement('div');
@@ -147,6 +167,7 @@
 
                     let estadoClienteText = "📋 Recibida en Cola";
                     if (enProceso) estadoClienteText = "🟡 En Proceso de Producción";
+                    else if (completada) estadoClienteText = "🎉 Canción Terminada";
                     else if (vista) estadoClienteText = "👀 Vista y Aceptada por el DJ";
 
                     let botonDescargaHtml = '';
@@ -172,27 +193,31 @@
                     contenedorMisSolicitudes.appendChild(cardCliente);
                 }
 
-                // 3. Renderizar vista completa de Administración
+                // 3. VISTA COMPLETA DE ADMINISTRACIÓN
                 if (esAdmin) {
                     const cardAdmin = document.createElement('div');
                     cardAdmin.className = enProceso 
                         ? "bg-amber-950/40 border-2 border-amber-500/80 rounded-xl p-3.5 space-y-2 shadow-2xl"
-                        : (vista ? "bg-sky-950/40 border-2 border-sky-500/80 rounded-xl p-3.5 space-y-2 shadow-xl"
-                                 : "bg-slate-800 border border-slate-700 rounded-xl p-3.5 space-y-2 shadow-lg");
+                        : (completada ? "bg-green-950/40 border-2 border-green-500/80 rounded-xl p-3.5 space-y-2 shadow-xl"
+                                     : (vista ? "bg-sky-950/40 border-2 border-sky-500/80 rounded-xl p-3.5 space-y-2 shadow-xl"
+                                              : "bg-slate-800 border border-slate-700 rounded-xl p-3.5 space-y-2 shadow-lg"));
 
                     const btnProcesoHtml = enProceso 
-                        ? `<button onclick="cambiarEstado('${id}', 'enProceso', false)" class="text-amber-300 bg-amber-900/60 border border-amber-500/60 text-[11px] px-2 py-1 rounded font-bold">
-                             <i class="fa-solid fa-spinner fa-spin"></i> En Proceso (Quitar)
+                        ? `<button onclick="completarCancion('${id}')" class="text-green-300 bg-green-900/60 border border-green-500/60 text-[11px] px-2 py-1 rounded font-bold">
+                             <i class="fa-solid fa-check"></i> ✅ Completar
+                           </button>
+                           <button onclick="cambiarEstado('${id}', 'enProceso', false)" class="text-amber-300 bg-amber-900/60 border border-amber-500/60 text-[11px] px-2 py-1 rounded font-bold">
+                             <i class="fa-solid fa-undo"></i> Quitar de Proceso
                            </button>`
                         : `<button onclick="cambiarEstado('${id}', 'enProceso', true)" class="text-slate-300 hover:text-amber-300 bg-slate-900 border border-slate-700 text-[11px] px-2 py-1 rounded">
                              <i class="fa-solid fa-play"></i> En Proceso
                            </button>`;
 
-                    const btnVistaHtml = vista && !enProceso
+                    const btnVistaHtml = vista && !enProceso && !completada
                         ? `<button onclick="cambiarEstado('${id}', 'vista', false)" class="text-sky-300 bg-sky-900/60 border border-sky-500/60 text-[11px] px-2 py-1 rounded font-bold">
                              <i class="fa-solid fa-eye-slash"></i> Vista (Quitar)
                            </button>`
-                        : (!enProceso ? `<button onclick="cambiarEstado('${id}', 'vista', true)" class="text-slate-300 hover:text-sky-300 bg-slate-900 border border-slate-700 text-[11px] px-2 py-1 rounded">
+                        : (!enProceso && !completada ? `<button onclick="cambiarEstado('${id}', 'vista', true)" class="text-slate-300 hover:text-sky-300 bg-slate-900 border border-slate-700 text-[11px] px-2 py-1 rounded">
                              <i class="fa-solid fa-eye"></i> Marcar Vista
                            </button>` : '');
 
@@ -230,9 +255,10 @@
                 }
             });
 
+            // Actualizar contador del título "Solicitudes en Cola (X)"
             contadorContenedor.innerText = `(${totalEnColaAdmin})`;
 
-            if (hayEnProceso || hayVistas) {
+            if (hayEnProceso || hayVistas || hayCompletadas) {
                 seccionDestacados.classList.remove('hidden');
             } else {
                 seccionDestacados.classList.add('hidden');
@@ -244,20 +270,39 @@
             if (contenedorVistas.children.length === 0) {
                 contenedorVistas.innerHTML = `<div class="text-center text-slate-500 py-3 text-xs italic">Ninguna marcada como vista.</div>`;
             }
+            if (contenedorCompletadas.children.length === 0) {
+                contenedorCompletadas.innerHTML = `<div class="text-center text-slate-500 py-3 text-xs italic">Ninguna canción completada aún.</div>`;
+            }
             if (!esAdmin && misSolicitudesCount === 0) {
                 contenedorMisSolicitudes.innerHTML = `<div class="text-center text-slate-500 py-6 text-xs">No tienes ninguna solicitud enviada por ahora.</div>`;
             }
             if (esAdmin && contenedorColaAdmin.children.length === 0) {
                 contenedorColaAdmin.innerHTML = `<div class="text-center text-slate-500 py-6 text-xs">No hay solicitudes registradas en la base de datos.</div>`;
             }
-        });
+        }
+
+        window.completarCancion = async function(id) {
+            if (!esAdmin) return;
+            const url = prompt("Introduce el enlace directo de descarga para la canción terminada:");
+            if (url !== null && url.trim() !== "") {
+                try {
+                    await updateDoc(doc(db, "solicitudes_musica", id), {
+                        enProceso: false,
+                        vista: false,
+                        completada: true,
+                        downloadUrl: url.trim()
+                    });
+                    alert("¡Canción completada y movida a la lista de listas para descargar!");
+                } catch (e) { console.error(e); }
+            }
+        };
 
         window.agregarEnlaceDescarga = async function(id) {
             if (!esAdmin) return;
             const url = prompt("Introduce el enlace directo de descarga para la canción (MP3/Drive/Dropbox):");
             if (url !== null) {
                 try {
-                    await updateDoc(doc(db, "solicitudes_musica", id), { downloadUrl: url });
+                    await updateDoc(doc(db, "solicitudes_musica", id), { downloadUrl: url.trim() });
                     alert("Enlace asignado con éxito a la solicitud.");
                 } catch (e) { console.error(e); }
             }
@@ -270,6 +315,7 @@
                 actualizacion[campo] = estado;
                 if (campo === 'enProceso' && estado === true) {
                     actualizacion['vista'] = false;
+                    actualizacion['completada'] = false;
                 }
                 await updateDoc(doc(db, "solicitudes_musica", id), actualizacion);
             } catch (e) { console.error(e); }
@@ -280,6 +326,7 @@
                 esAdmin = false;
                 sessionStorage.removeItem('is_dj_admin');
                 actualizarInterfaz();
+                renderizarListas();
                 return;
             }
             document.getElementById('modalLoginAdmin').classList.remove('hidden');
@@ -299,6 +346,7 @@
                 sessionStorage.setItem('is_dj_admin', 'true');
                 cerrarModalAdmin();
                 actualizarInterfaz();
+                renderizarListas(); // Renderiza al instante sin recargar la página
             } else { alert("Contraseña incorrecta."); }
         };
 
@@ -355,6 +403,7 @@
             esAdmin = false;
             sessionStorage.removeItem('is_dj_admin');
             actualizarInterfaz();
+            renderizarListas();
         };
 
         window.borrarSolicitud = async function(id) {
@@ -484,6 +533,7 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
                     estiloMusica: estiloFinal,
                     enProceso: false,
                     vista: false,
+                    completada: false,
                     downloadUrl: "",
                     creado: Date.now()
                 });
@@ -597,20 +647,30 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
             </form>
         </div>
 
-        <!-- SECCIÓN DE ESTADOS PÚBLICOS (Nombres enmascarados) -->
-        <div id="seccionDestacadosDosColumnas" class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 hidden">
+        <!-- SECCIÓN DE ESTADOS PÚBLICOS (Dividida en 3 bloques dinámicos) -->
+        <div id="seccionDestacadosDosColumnas" class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 hidden">
+            <!-- BLOQUE 1: EN PROCESO -->
             <div class="space-y-2 bg-slate-900/40 p-3.5 rounded-xl border border-amber-500/30">
-                <h2 class="text-base font-bold text-amber-300 flex items-center gap-2 border-b border-amber-500/20 pb-2">
+                <h2 class="text-sm font-bold text-amber-300 flex items-center gap-1.5 border-b border-amber-500/20 pb-2">
                     <i class="fa-solid fa-compact-disc text-amber-400 animate-spin"></i> 🟡 En Proceso Actualmente
                 </h2>
                 <div id="listaEnProceso" class="space-y-3"></div>
             </div>
 
+            <!-- BLOQUE 2: VISTAS Y ACEPTADAS -->
             <div class="space-y-2 bg-slate-900/40 p-3.5 rounded-xl border border-sky-500/30">
-                <h2 class="text-base font-bold text-sky-300 flex items-center gap-2 border-b border-sky-500/20 pb-2">
+                <h2 class="text-sm font-bold text-sky-300 flex items-center gap-1.5 border-b border-sky-500/20 pb-2">
                     <i class="fa-solid fa-circle-check text-sky-400"></i> 👀 Vistas y Aceptadas
                 </h2>
                 <div id="listaVistas" class="space-y-3"></div>
+            </div>
+
+            <!-- BLOQUE 3: CANCIONES COMPLETADAS -->
+            <div class="space-y-2 bg-slate-900/40 p-3.5 rounded-xl border border-green-500/30">
+                <h2 class="text-sm font-bold text-green-300 flex items-center gap-1.5 border-b border-green-500/20 pb-2">
+                    <i class="fa-solid fa-circle-play text-green-400"></i> 🎉 Canciones Completadas
+                </h2>
+                <div id="listaCompletadas" class="space-y-3"></div>
             </div>
         </div>
 
@@ -627,7 +687,7 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
         <!-- BLOQUE VISTA ADMINISTRADOR COMPLETA -->
         <div id="bloqueAdminCola" class="space-y-3 pt-4 hidden">
             <h2 class="text-lg font-bold text-amber-400 flex items-center gap-2 border-b border-slate-800 pb-2">
-                <i class="fa-solid fa-list-check"></i> Todas las Solicitudes (Admin) <span id="contadorSolicitudes" class="text-amber-300 font-semibold">(0)</span>
+                <i class="fa-solid fa-list-check"></i> Solicitudes en Cola <span id="contadorSolicitudes" class="text-amber-300 font-semibold">(0)</span>
             </h2>
             <div id="listaSolicitudesAdmin" class="space-y-3">
                 <div class="text-center text-slate-500 py-6">Cargando base de datos completa...</div>
