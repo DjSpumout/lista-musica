@@ -10,7 +10,7 @@
     <!-- Firebase SDK v10 -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, setDoc, query, orderBy, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, setDoc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSy...", 
@@ -24,6 +24,9 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
+        // Caché seguro en memoria para evitar ruptura de comillas en onclick
+        window.solicitudesCache = {};
+
         // Identificador Privado Único por Cliente
         let clientId = localStorage.getItem('dj_client_user_id');
         if (!clientId) {
@@ -35,18 +38,18 @@
         let esAdmin = sessionStorage.getItem('is_dj_admin') === 'true';
         let fechaInicioGlobal = "";
         let fechaFinPlazoGlobal = "";
-        let snapshotActual = null;
+        let listaDocumentosActual = [];
 
         function enmascararTexto(texto) {
             if (!texto) return "***";
-            const limpio = texto.trim();
+            const limpio = String(texto).trim();
             if (limpio.length <= 2) return limpio[0] + "***";
             return limpio[0] + "***" + limpio[limpio.length - 1];
         }
 
         function formatearFechaEsp(fechaStr) {
             if (!fechaStr) return "";
-            const partes = fechaStr.split("-");
+            const partes = String(fechaStr).split("-");
             if (partes.length === 3) return `${partes[2]}/${partes[1]}/${partes[0]}`;
             return fechaStr;
         }
@@ -64,7 +67,7 @@
         onSnapshot(doc(db, "configuracion", "estado_plaza"), (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
-                plazaAbierta = data.abierta ?? false;
+                plazaAbierta = Boolean(data.abierta);
                 fechaInicioGlobal = data.fechaInicio || obtenerHoyISO();
                 fechaFinPlazoGlobal = data.fechaFinPlazo || sumarDiasAFecha(fechaInicioGlobal, 20);
             } else {
@@ -75,16 +78,81 @@
             actualizarInterfaz();
         });
 
-        // Escuchar base de datos en tiempo real
-        const q = query(collection(db, "solicitudes_musica"), orderBy("creado", "desc"));
-        onSnapshot(q, (snapshot) => {
-            snapshotActual = snapshot;
+        // Lectura directa sin orderBy en Firestore para NO excluir registros antiguos sin campo 'creado'
+        onSnapshot(collection(db, "solicitudes_musica"), (snapshot) => {
+            const docs = [];
+            window.solicitudesCache = {};
+            snapshot.forEach((docItem) => {
+                const data = docItem.data();
+                window.solicitudesCache[docItem.id] = data;
+                docs.push({ id: docItem.id, data: data });
+            });
+            // Ordenar en cliente de más reciente a más antiguo (los antiguos sin 'creado' van al final sin perderse)
+            docs.sort((a, b) => (b.data.creado || 0) - (a.data.creado || 0));
+            listaDocumentosActual = docs;
             renderizarListas();
         });
 
-        function renderizarListas() {
-            if (!snapshotActual) return;
+        function generarBotonesAdmin(id, enProceso, vista, completada) {
+            if (!esAdmin) return '';
 
+            let btnProceso = '';
+            if (enProceso) {
+                btnProceso = `
+                    <button type="button" onclick="completarCancion('${id}')" class="text-green-300 bg-green-900/70 hover:bg-green-800 border border-green-500/60 text-[11px] px-2 py-1 rounded font-bold transition cursor-pointer">
+                        <i class="fa-solid fa-check"></i> Completar
+                    </button>
+                    <button type="button" onclick="cambiarEstado('${id}', 'enProceso', false)" class="text-amber-300 bg-amber-900/60 hover:bg-amber-800 border border-amber-500/60 text-[11px] px-2 py-1 rounded font-bold transition cursor-pointer">
+                        <i class="fa-solid fa-undo"></i> Quitar
+                    </button>`;
+            } else {
+                btnProceso = `
+                    <button type="button" onclick="cambiarEstado('${id}', 'enProceso', true)" class="text-slate-300 hover:text-amber-300 bg-slate-900 border border-slate-700 text-[11px] px-2 py-1 rounded transition cursor-pointer">
+                        <i class="fa-solid fa-play"></i> En Proceso
+                    </button>`;
+            }
+
+            let btnVista = '';
+            if (!enProceso && !completada) {
+                btnVista = vista
+                    ? `<button type="button" onclick="cambiarEstado('${id}', 'vista', false)" class="text-sky-300 bg-sky-900/60 hover:bg-sky-800 border border-sky-500/60 text-[11px] px-2 py-1 rounded font-bold transition cursor-pointer">
+                         <i class="fa-solid fa-eye-slash"></i> Quitar Vista
+                       </button>`
+                    : `<button type="button" onclick="cambiarEstado('${id}', 'vista', true)" class="text-slate-300 hover:text-sky-300 bg-slate-900 border border-slate-700 text-[11px] px-2 py-1 rounded transition cursor-pointer">
+                         <i class="fa-solid fa-eye"></i> Marcar Vista
+                       </button>`;
+            }
+
+            return `
+                <div class="flex items-center gap-1 flex-wrap pt-1">
+                    ${btnProceso}
+                    ${btnVista}
+                    <button type="button" onclick="agregarEnlaceDescarga('${id}')" class="text-green-400 hover:text-green-300 text-[11px] bg-green-950/60 border border-green-800/60 px-2 py-1 rounded transition cursor-pointer">
+                        <i class="fa-solid fa-link"></i> Link Descarga
+                    </button>
+                    <button type="button" onclick="copiarFichaIA('${id}')" class="text-amber-400 hover:text-amber-300 text-[11px] bg-amber-950/50 border border-amber-800/60 px-2 py-1 rounded transition cursor-pointer" title="Copiar Ficha">
+                        <i class="fa-solid fa-copy"></i> Copiar
+                    </button>
+                    <button type="button" onclick="borrarSolicitud('${id}')" class="text-red-400 hover:text-red-300 text-[11px] bg-red-950/60 border border-red-800/60 px-2 py-1 rounded transition cursor-pointer" title="Eliminar">
+                        <i class="fa-solid fa-trash"></i> Eliminar
+                    </button>
+                </div>`;
+        }
+
+        function generarDetallesAdmin(data) {
+            if (!esAdmin) return '';
+            return `
+                <div class="bg-slate-900/90 p-2.5 rounded-lg border border-amber-500/30 text-[11px] text-slate-300 space-y-1 mt-2">
+                    <p class="text-amber-400 font-bold border-b border-slate-800 pb-1 mb-1"><i class="fa-solid fa-user-lock mr-1"></i>Detalles Reservados (Admin):</p>
+                    ${data.estiloMusica ? `<p><strong class="text-slate-200">Estilo:</strong> ${data.estiloMusica} | <strong>Tono:</strong> ${data.tonoMensaje || 'N/A'}</p>` : ''}
+                    ${data.personalidad ? `<p><strong class="text-slate-200">Carácter:</strong> ${data.personalidad}</p>` : ''}
+                    ${data.gustos ? `<p><strong class="text-slate-200">Gustos:</strong> ${data.gustos}</p>` : ''}
+                    ${data.anecdota ? `<p><strong class="text-slate-200">Anécdota:</strong> ${data.anecdota}</p>` : ''}
+                    ${data.downloadUrl ? `<p class="text-green-400 truncate"><strong class="text-slate-200">Link activo:</strong> ${data.downloadUrl}</p>` : ''}
+                </div>`;
+        }
+
+        function renderizarListas() {
             const contenedorProceso = document.getElementById('listaEnProceso');
             const contenedorVistas = document.getElementById('listaVistas');
             const contenedorCompletadas = document.getElementById('listaCompletadas');
@@ -105,85 +173,65 @@
             let totalEnCola = 0;
             let misSolicitudesCount = 0;
 
-            snapshotActual.forEach((docItem) => {
-                const data = docItem.data();
-                const id = docItem.id;
-                const enProceso = data.enProceso ?? false;
-                const vista = data.vista ?? false;
-                const completada = data.completada ?? false;
+            listaDocumentosActual.forEach((item) => {
+                const id = item.id;
+                const data = item.data;
+                
+                // Normalización estricta de estados para soportar registros antiguos y nuevos
+                const enProceso = data.enProceso === true;
+                const completada = data.completada === true;
+                const vista = data.vista === true && !enProceso && !completada;
+                const enCola = !enProceso && !completada && !vista;
                 const esMio = data.clientId === clientId;
 
                 if (enProceso) hayEnProceso = true;
-                if (vista && !enProceso && !completada) hayVistas = true;
+                if (vista) hayVistas = true;
                 if (completada) hayCompletadas = true;
-                if (!enProceso && !vista && !completada) totalEnCola++;
+                if (enCola) totalEnCola++;
 
-                // 1. CLASIFICACIÓN PÚBLICA (Nombres enmascarados para los usuarios)
-                if (enProceso || vista || completada) {
-                    const cardPublica = document.createElement('div');
-                    cardPublica.className = enProceso 
-                        ? "bg-amber-950/40 border-2 border-amber-500/80 rounded-xl p-3.5 space-y-2 shadow-2xl animate-pulse"
+                const nombreMostrar = esAdmin ? (data.nombre || 'Sin nombre') : enmascararTexto(data.nombre);
+                const perfilMostrar = esAdmin ? (data.perfil || '') : enmascararTexto(data.perfil);
+                const accionesAdminHtml = generarBotonesAdmin(id, enProceso, vista, completada);
+                const detallesAdminHtml = generarDetallesAdmin(data);
+
+                // 1. RENDERIZAR EN LAS 3 LISTAS DESTACADAS (En Proceso / Vistas / Completadas)
+                if (!enCola) {
+                    const cardDestacada = document.createElement('div');
+                    cardDestacada.className = enProceso 
+                        ? "bg-amber-950/40 border-2 border-amber-500/80 rounded-xl p-3.5 space-y-2 shadow-2xl"
                         : (completada ? "bg-green-950/40 border-2 border-green-500/80 rounded-xl p-3.5 space-y-2 shadow-xl"
                                      : "bg-sky-950/40 border-2 border-sky-500/80 rounded-xl p-3.5 space-y-2 shadow-xl");
                     
-                    const nombrePublico = esAdmin ? data.nombre : enmascararTexto(data.nombre);
-                    let badgePublico = '';
+                    let badgeEstado = '';
                     if (enProceso) {
-                        badgePublico = `<span class="bg-amber-500 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider inline-flex items-center gap-1"><i class="fa-solid fa-compact-disc animate-spin"></i> Produciendo</span>`;
+                        badgeEstado = `<span class="bg-amber-500 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider inline-flex items-center gap-1"><i class="fa-solid fa-compact-disc animate-spin"></i> Produciendo</span>`;
                     } else if (completada) {
-                        badgePublico = `<span class="bg-green-500 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider inline-flex items-center gap-1"><i class="fa-solid fa-check"></i> Lista</span>`;
+                        badgeEstado = `<span class="bg-green-500 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider inline-flex items-center gap-1"><i class="fa-solid fa-check"></i> Lista</span>`;
                     } else if (vista) {
-                        badgePublico = `<span class="bg-sky-500 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider inline-flex items-center gap-1"><i class="fa-solid fa-check-double"></i> Vista y Anotada</span>`;
+                        badgeEstado = `<span class="bg-sky-500 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider inline-flex items-center gap-1"><i class="fa-solid fa-check-double"></i> Vista</span>`;
                     }
 
-                    cardPublica.innerHTML = `
-                        <div class="flex justify-between items-center">
-                            <span class="text-amber-400 font-bold text-sm">${nombrePublico}</span>
-                            ${badgePublico}
+                    cardDestacada.innerHTML = `
+                        <div class="flex justify-between items-start gap-1 flex-wrap">
+                            <div>
+                                <span class="text-amber-400 font-bold text-sm block">${nombreMostrar}</span>
+                                ${esAdmin && perfilMostrar ? `<span class="text-slate-400 text-[11px] block">${perfilMostrar}</span>` : ''}
+                            </div>
+                            ${badgeEstado}
                         </div>
                         <p class="text-[11px] text-slate-400"><i class="fa-solid fa-calendar-day mr-1"></i>Plazo: ${formatearFechaEsp(data.fechaInicio)} al ${formatearFechaEsp(data.fechaFin)}</p>
+                        ${accionesAdminHtml}
+                        ${detallesAdminHtml}
                     `;
 
-                    if (enProceso) contenedorProceso.appendChild(cardPublica);
-                    else if (completada) contenedorCompletadas.appendChild(cardPublica);
-                    else if (vista) contenedorVistas.appendChild(cardPublica);
-                } else {
-                    // Tarjeta para la lista 'Solicitudes en Cola'
+                    if (enProceso) contenedorProceso.appendChild(cardDestacada);
+                    else if (completada) contenedorCompletadas.appendChild(cardDestacada);
+                    else if (vista) contenedorVistas.appendChild(cardDestacada);
+                } 
+                // 2. RENDERIZAR EN 'SOLICITUDES EN COLA'
+                else {
                     const cardCola = document.createElement('div');
                     cardCola.className = "bg-slate-800 border border-slate-700 rounded-xl p-3.5 space-y-2 shadow-lg relative";
-
-                    const nombreMostrar = esAdmin ? data.nombre : enmascararTexto(data.nombre);
-                    const perfilMostrar = esAdmin ? data.perfil : enmascararTexto(data.perfil);
-
-                    let accionesAdminHtml = '';
-                    let detallesPrivadosHtml = '';
-
-                    if (esAdmin) {
-                        accionesAdminHtml = `
-                            <div class="flex items-center gap-1 flex-wrap">
-                                <button onclick="cambiarEstado('${id}', 'enProceso', true)" class="text-slate-300 hover:text-amber-300 bg-slate-900 border border-slate-700 text-[11px] px-2 py-1 rounded">
-                                    <i class="fa-solid fa-play"></i> En Proceso
-                                </button>
-                                <button onclick="cambiarEstado('${id}', 'vista', true)" class="text-slate-300 hover:text-sky-300 bg-slate-900 border border-slate-700 text-[11px] px-2 py-1 rounded">
-                                    <i class="fa-solid fa-eye"></i> Marcar Vista
-                                </button>
-                                <button onclick='copiarFichaIA(${JSON.stringify(data)})' class="text-amber-400 hover:text-amber-300 text-[11px] bg-amber-950/40 border border-amber-800/50 px-2 py-1 rounded">
-                                    <i class="fa-solid fa-copy"></i>
-                                </button>
-                                <button onclick="borrarSolicitud('${id}')" class="text-red-400 hover:text-red-300 text-[11px] bg-red-950/50 border border-red-800/50 px-2 py-1 rounded">
-                                    <i class="fa-solid fa-trash"></i>
-                                </button>
-                            </div>`;
-
-                        detallesPrivadosHtml = `
-                            <div class="bg-slate-900/90 p-2.5 rounded-lg border border-amber-500/30 text-[11px] text-slate-300 space-y-1 mt-2">
-                                <p class="text-amber-400 font-bold border-b border-slate-800 pb-1 mb-1"><i class="fa-solid fa-user-lock mr-1"></i>Detalles Reservados (Admin):</p>
-                                ${data.estiloMusica ? `<p><strong class="text-slate-200">Estilo:</strong> ${data.estiloMusica} | <strong>Tono:</strong> ${data.tonoMensaje}</p>` : ''}
-                                ${data.personalidad ? `<p><strong class="text-slate-200">Carácter:</strong> ${data.personalidad}</p>` : ''}
-                                ${data.gustos ? `<p><strong class="text-slate-200">Gustos:</strong> ${data.gustos}</p>` : ''}
-                                ${data.anecdota ? `<p><strong class="text-slate-200">Anécdota:</strong> ${data.anecdota}</p>` : ''}
-                            </div>`;
-                    }
 
                     cardCola.innerHTML = `
                         <div class="flex justify-between items-start flex-wrap gap-1.5">
@@ -196,12 +244,12 @@
                         <div class="bg-slate-900/60 p-2 rounded-lg border border-slate-700/50 text-[11px] text-slate-300 mt-1.5">
                             <p><strong class="text-amber-400"><i class="fa-solid fa-calendar-day mr-1"></i>Plazo:</strong> ${formatearFechaEsp(data.fechaInicio)} al ${formatearFechaEsp(data.fechaFin)}</p>
                         </div>
-                        ${detallesPrivadosHtml}
+                        ${detallesAdminHtml}
                     `;
                     contenedorColaPublica.appendChild(cardCola);
                 }
 
-                // 2. VISTA PRIVADA INDIVIDUAL DEL CLIENTE
+                // 3. VISTA PRIVADA INDIVIDUAL DEL CLIENTE
                 if (esMio) {
                     misSolicitudesCount++;
                     const cardCliente = document.createElement('div');
@@ -236,12 +284,12 @@
                 }
             });
 
-            // Actualizar el contador dinámico en el título "(X)"
+            // Actualizar contador real
             if (contadorContenedor) {
                 contadorContenedor.innerText = `(${totalEnCola})`;
             }
 
-            if (hayEnProceso || hayVistas || hayCompletadas) {
+            if (hayEnProceso || hayVistas || hayCompletadas || esAdmin) {
                 seccionDestacados.classList.remove('hidden');
             } else {
                 seccionDestacados.classList.add('hidden');
@@ -264,9 +312,12 @@
             }
         }
 
+        // --- FUNCIONES DE ADMINISTRACIÓN ENLAZADAS A FIREBASE ---
+
         window.completarCancion = async function(id) {
             if (!esAdmin) return;
-            const url = prompt("Introduce el enlace directo de descarga para la canción terminada:");
+            const datosActuales = window.solicitudesCache[id] || {};
+            const url = prompt("Introduce el enlace directo de descarga para la canción terminada:", datosActuales.downloadUrl || "");
             if (url !== null && url.trim() !== "") {
                 try {
                     await updateDoc(doc(db, "solicitudes_musica", id), {
@@ -275,19 +326,27 @@
                         completada: true,
                         downloadUrl: url.trim()
                     });
-                    alert("¡Canción completada y movida a la lista de canciones completadas!");
-                } catch (e) { console.error(e); }
+                } catch (e) {
+                    console.error("Error al completar:", e);
+                    alert("Error al actualizar en Firebase: " + e.message);
+                }
             }
         };
 
         window.agregarEnlaceDescarga = async function(id) {
             if (!esAdmin) return;
-            const url = prompt("Introduce el enlace directo de descarga para la canción (MP3/Drive/Dropbox):");
+            const datosActuales = window.solicitudesCache[id] || {};
+            const url = prompt("Introduce el enlace directo de descarga para la canción (MP3/Drive/Dropbox):", datosActuales.downloadUrl || "");
             if (url !== null) {
                 try {
-                    await updateDoc(doc(db, "solicitudes_musica", id), { downloadUrl: url.trim() });
-                    alert("Enlace asignado con éxito a la solicitud.");
-                } catch (e) { console.error(e); }
+                    await updateDoc(doc(db, "solicitudes_musica", id), { 
+                        downloadUrl: url.trim() 
+                    });
+                    alert("Enlace actualizado correctamente.");
+                } catch (e) {
+                    console.error("Error al guardar link:", e);
+                    alert("Error al guardar enlace: " + e.message);
+                }
             }
         };
 
@@ -300,9 +359,55 @@
                     actualizacion['vista'] = false;
                     actualizacion['completada'] = false;
                 }
+                if (campo === 'vista' && estado === true) {
+                    actualizacion['enProceso'] = false;
+                    actualizacion['completada'] = false;
+                }
                 await updateDoc(doc(db, "solicitudes_musica", id), actualizacion);
-            } catch (e) { console.error(e); }
+            } catch (e) {
+                console.error("Error cambiando estado:", e);
+                alert("Error al cambiar el estado: " + e.message);
+            }
         };
+
+        window.copiarFichaIA = function(id) {
+            const data = window.solicitudesCache[id];
+            if (!data) return;
+
+            const textoFicha = `CREAR CANCIÓN DE IA PARA: ${data.nombre || 'Sin nombre'} (${data.perfil || 'Sin perfil'})
+Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
+----------------------------------------------
+- Edad/Cumpleaños: ${data.edadCumple || 'N/A'}
+- Relación: ${data.relacion || 'N/A'}
+- Personalidad: ${data.personalidad || 'N/A'}
+- Gustos: ${data.gustos || 'N/A'}
+- Frase típica: ${data.fraseTipica || 'N/A'}
+- Anécdota: ${data.anecdota || 'N/A'}
+- Qué le hace especial: ${data.queLeHaceEspecial || 'N/A'}
+- Tono deseado: ${data.tonoMensaje || 'N/A'}
+- Estilo musical: ${data.estiloMusica || 'N/A'}`;
+
+            navigator.clipboard.writeText(textoFicha).then(() => {
+                alert("¡Ficha copiada al portapapeles!");
+            }).catch(err => {
+                console.error("Error al copiar:", err);
+                alert("No se pudo copiar automáticamente.");
+            });
+        };
+
+        window.borrarSolicitud = async function(id) {
+            if (!esAdmin) return;
+            if (confirm("¿Seguro que deseas eliminar definitivamente esta solicitud?")) {
+                try {
+                    await deleteDoc(doc(db, "solicitudes_musica", id));
+                } catch (e) {
+                    console.error("Error eliminando:", e);
+                    alert("Error al eliminar: " + e.message);
+                }
+            }
+        };
+
+        // --- CONTROL DE LOGIN Y PLAZA ---
 
         window.abrirModalAdmin = function() {
             if (esAdmin) {
@@ -387,31 +492,6 @@
             sessionStorage.removeItem('is_dj_admin');
             actualizarInterfaz();
             renderizarListas();
-        };
-
-        window.borrarSolicitud = async function(id) {
-            if (confirm("¿Seguro que deseas borrar esta solicitud de la lista?")) {
-                try { await deleteDoc(doc(db, "solicitudes_musica", id)); } catch (e) { console.error(e); }
-            }
-        };
-
-        window.copiarFichaIA = function(data) {
-            const textoFicha = `CREAR CANCIÓN DE IA PARA: ${data.nombre} (${data.perfil})
-Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
-----------------------------------------------
-- Edad/Cumpleaños: ${data.edadCumple || 'N/A'}
-- Relación: ${data.relacion || 'N/A'}
-- Personalidad: ${data.personalidad || 'N/A'}
-- Gustos: ${data.gustos || 'N/A'}
-- Frase típica: ${data.fraseTipica || 'N/A'}
-- Anécdota: ${data.anecdota || 'N/A'}
-- Qué le hace especial: ${data.queLeHaceEspecial || 'N/A'}
-- Tono deseado: ${data.tonoMensaje || 'N/A'}
-- Estilo musical: ${data.estiloMusica || 'N/A'}`;
-
-            navigator.clipboard.writeText(textoFicha).then(() => {
-                alert("¡Ficha copiada al portapapeles! Ya puedes pegarla en ChatGPT.");
-            });
         };
 
         function actualizarInterfaz() {
@@ -541,11 +621,11 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
         <i class="fa-solid fa-crown text-amber-400 animate-bounce"></i> Modo Administrador Activo
     </div>
 
-    <button id="btnVolverAdmin" onclick="abrirModalAdmin()" class="fixed top-3 right-3 bg-slate-800/90 border border-amber-500/40 text-amber-400 px-3 py-1.5 rounded-full text-xs font-bold shadow-lg flex items-center gap-1.5 z-30 hover:bg-slate-700 transition">
+    <button id="btnVolverAdmin" type="button" onclick="abrirModalAdmin()" class="fixed top-3 right-3 bg-slate-800/90 border border-amber-500/40 text-amber-400 px-3 py-1.5 rounded-full text-xs font-bold shadow-lg flex items-center gap-1.5 z-30 hover:bg-slate-700 transition">
         <i class="fa-solid fa-crown"></i> Acceso Admin
     </button>
 
-    <div class="max-w-4xl mx-auto space-y-6">
+    <div class="max-w-5xl mx-auto space-y-6">
         
         <header class="text-center space-y-3">
             <h1 class="text-3xl font-bold text-amber-400"><i class="fa-solid fa-music mr-2"></i>Lista Música de IA</h1>
@@ -557,7 +637,7 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
                 <a href="https://about.me/djespuma_preseta_a_su_informacio" target="_blank" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-1.5 rounded-full text-xs font-semibold transition flex items-center gap-2 shadow hover:border-amber-400">
                     <i class="fa-solid fa-user text-amber-400"></i> Mi Información (about.me)
                 </a>
-                <button onclick="document.getElementById('modalInfoSpumout').classList.remove('hidden')" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-1.5 rounded-full text-xs font-semibold transition flex items-center gap-2 shadow hover:border-amber-400">
+                <button type="button" onclick="document.getElementById('modalInfoSpumout').classList.remove('hidden')" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-1.5 rounded-full text-xs font-semibold transition flex items-center gap-2 shadow hover:border-amber-400">
                     <i class="fa-solid fa-circle-info text-amber-400"></i> Sobre DJ Spumout
                 </button>
             </div>
@@ -569,17 +649,17 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
             <div id="adminPanel" class="hidden bg-slate-800/90 border border-amber-500/40 p-4 rounded-xl space-y-4 shadow-inner mt-2">
                 <div class="flex items-center justify-between border-b border-slate-700/60 pb-2">
                     <span class="text-xs text-amber-400 font-bold flex items-center gap-1"><i class="fa-solid fa-crown"></i> Panel DJ Spumout</span>
-                    <button onclick="modoVistaPublica()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs px-2.5 py-1 rounded transition">
+                    <button type="button" onclick="modoVistaPublica()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs px-2.5 py-1 rounded transition">
                         <i class="fa-solid fa-eye mr-1"></i>Ver Vista Público
                     </button>
                 </div>
                 
                 <div class="flex flex-col md:flex-row items-center justify-between gap-3">
                     <div class="flex gap-2 w-full md:w-auto">
-                        <button onclick="cambiarEstadoPlaza(true)" class="flex-1 md:flex-initial bg-green-600 hover:bg-green-500 text-white text-xs font-bold px-3 py-2 rounded-lg transition flex items-center justify-center gap-1">
+                        <button type="button" onclick="cambiarEstadoPlaza(true)" class="flex-1 md:flex-initial bg-green-600 hover:bg-green-500 text-white text-xs font-bold px-3 py-2 rounded-lg transition flex items-center justify-center gap-1">
                             <i class="fa-solid fa-lock-open"></i> Abrir Plaza
                         </button>
-                        <button onclick="cambiarEstadoPlaza(false)" class="flex-1 md:flex-initial bg-red-600 hover:bg-red-500 text-white text-xs font-bold px-3 py-2 rounded-lg transition flex items-center justify-center gap-1">
+                        <button type="button" onclick="cambiarEstadoPlaza(false)" class="flex-1 md:flex-initial bg-red-600 hover:bg-red-500 text-white text-xs font-bold px-3 py-2 rounded-lg transition flex items-center justify-center gap-1">
                             <i class="fa-solid fa-lock"></i> Cerrar Plaza
                         </button>
                     </div>
@@ -593,7 +673,7 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
                             <label class="text-slate-400">Fin Cierre:</label>
                             <input type="date" id="inputFechaFinPanel" onchange="alCambiarFechaFin()" class="bg-slate-800 text-white border border-slate-700 rounded p-1 text-xs">
                         </div>
-                        <button onclick="guardarFechasPanel()" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-2 py-1 rounded transition ml-1">
+                        <button type="button" onclick="guardarFechasPanel()" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-2 py-1 rounded transition ml-1">
                             Guardar
                         </button>
                     </div>
@@ -630,7 +710,7 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
             </form>
         </div>
 
-        <!-- SECCIÓN DE ESTADOS DESTACADOS (3 COLUMNAS SUPERIORES) -->
+        <!-- 3 LISTAS DE ESTADOS DESTACADOS (En Proceso / Vistas / Completadas) -->
         <div id="seccionDestacadosTresColumnas" class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 hidden">
             <!-- 1. EN PROCESO -->
             <div class="space-y-2 bg-slate-900/40 p-3.5 rounded-xl border border-amber-500/30">
@@ -667,7 +747,7 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
             </div>
         </div>
 
-        <!-- BLOQUE VISTA CLIENTE PRIVADO INDIVIDUAL -->
+        <!-- SECCIÓN PRIVADA INDIVIDUAL DEL CLIENTE -->
         <div id="bloqueClientePrivado" class="space-y-3 pt-6 border-t border-slate-800">
             <h2 class="text-lg font-bold text-amber-400 flex items-center gap-2 border-b border-slate-800 pb-2">
                 <i class="fa-solid fa-user-gear"></i> Mi Solicitud Privada
@@ -682,7 +762,7 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
     <!-- MODAL INFORMACIÓN DJ SPUMOUT -->
     <div id="modalInfoSpumout" onclick="if(event.target === this) this.classList.add('hidden')" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden justify-center items-center z-50 p-4">
         <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-lg w-full space-y-4 shadow-2xl relative my-8">
-            <button onclick="document.getElementById('modalInfoSpumout').classList.add('hidden')" class="absolute top-3 right-3 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            <button type="button" onclick="document.getElementById('modalInfoSpumout').classList.add('hidden')" class="absolute top-3 right-3 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
             <div class="text-center space-y-1 border-b border-slate-700 pb-3">
                 <h3 class="text-amber-400 font-bold text-lg flex items-center justify-center gap-2"><i class="fa-solid fa-compact-disc text-amber-400 animate-spin"></i> DJ Spumout</h3>
                 <p class="text-xs text-slate-400">Director en Dos Hermanas, España</p>
@@ -698,18 +778,18 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
                 <p>Puedes encontrarme en TikTok, Twitch y otras redes sociales, donde también hago directos y comparto mi trabajo.</p>
                 <p class="text-amber-400 font-bold text-center">Gracias por estar aquí 🙌</p>
             </div>
-            <button onclick="document.getElementById('modalInfoSpumout').classList.add('hidden')" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-2 rounded text-xs transition">Entendido</button>
+            <button type="button" onclick="document.getElementById('modalInfoSpumout').classList.add('hidden')" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-2 rounded text-xs transition">Entendido</button>
         </div>
     </div>
 
     <!-- ACCESO ADMIN -->
-    <button onclick="abrirModalAdmin()" title="Acceso Admin" class="fixed bottom-3 right-3 bg-slate-800/60 hover:bg-slate-700 text-slate-500 hover:text-amber-400 p-2.5 rounded-full border border-slate-700/50 transition duration-200 text-xs opacity-40 hover:opacity-100 z-30">
+    <button type="button" onclick="abrirModalAdmin()" title="Acceso Admin" class="fixed bottom-3 right-3 bg-slate-800/60 hover:bg-slate-700 text-slate-500 hover:text-amber-400 p-2.5 rounded-full border border-slate-700/50 transition duration-200 text-xs opacity-40 hover:opacity-100 z-30">
         <i class="fa-solid fa-user-shield"></i>
     </button>
 
     <div id="modalLoginAdmin" onclick="if(event.target === this) cerrarModalAdmin()" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden justify-center items-center z-50 p-4">
         <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-xs w-full space-y-4 shadow-2xl relative">
-            <button onclick="cerrarModalAdmin()" class="absolute top-3 right-3 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            <button type="button" onclick="cerrarModalAdmin()" class="absolute top-3 right-3 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
             <h3 class="text-amber-400 font-bold text-base flex items-center gap-2"><i class="fa-solid fa-crown"></i> Acceso Admin</h3>
             <form onsubmit="verificarClaveAdmin(event)" class="space-y-3">
                 <input type="password" id="claveAdminInput" placeholder="Contraseña Admin" required class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-400">
@@ -728,7 +808,7 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
     <!-- MODAL FORMULARIO FICHA -->
     <div id="modalPlantilla" onclick="if(event.target === this) document.getElementById('modalPlantilla').classList.add('hidden')" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md hidden justify-center items-center z-40 p-4 overflow-y-auto">
         <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-2xl w-full my-8 space-y-6 shadow-2xl relative">
-            <button onclick="document.getElementById('modalPlantilla').classList.add('hidden')" class="absolute top-4 right-4 text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            <button type="button" onclick="document.getElementById('modalPlantilla').classList.add('hidden')" class="absolute top-4 right-4 text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
             <div class="text-center border-b border-slate-700 pb-4">
                 <h2 class="text-2xl font-bold text-amber-400"><i class="fa-solid fa-sliders mr-2"></i>Personaliza la Canción</h2>
                 <p class="text-xs text-slate-400 mt-1">Rellena esta ficha para que la canción quede perfecta</p>
