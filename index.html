@@ -314,8 +314,8 @@
             actualizarVistaAdmin();
         };
 
-        // ESCUCHAR CONFIGURACIÓN DE PLAZA EN TIEMPO REAL
-        const configRef = doc(db, "configuracion", "plaza");
+        // ESCUCHAR CONFIGURACIÓN DE PLAZA EN TIEMPO REAL (configuracion/estado_plaza)
+        const configRef = doc(db, "configuracion", "estado_plaza");
         onSnapshot(configRef, (docSnap) => {
             let abierta = false;
             let inicio = "";
@@ -324,8 +324,8 @@
             if (docSnap.exists()) {
                 const data = docSnap.data();
                 abierta = data.abierta === true;
-                inicio = data.inicio || "";
-                fin = data.fin || "";
+                inicio = data.fechaInicio || data.inicio || "";
+                fin = data.fechaFinPlazo || data.fin || "";
             }
 
             document.getElementById('fechaInicio').value = inicio;
@@ -363,17 +363,17 @@
         };
 
         window.guardarFechasPlaza = async function() {
-            const inicio = document.getElementById('fechaInicio').value;
-            const fin = document.getElementById('fechaFin').value;
+            const fechaInicio = document.getElementById('fechaInicio').value;
+            const fechaFinPlazo = document.getElementById('fechaFin').value;
             try {
-                await setDoc(configRef, { inicio, fin }, { merge: true });
+                await setDoc(configRef, { fechaInicio, fechaFinPlazo }, { merge: true });
                 alert("Fechas guardadas correctamente.");
             } catch (e) {
                 alert("Error al guardar fechas: " + e.message);
             }
         };
 
-        // ENVIAR NUEVA SOLICITUD
+        // ENVIAR NUEVA SOLICITUD A solicitudes_musica
         window.enviarSolicitud = async function(e) {
             e.preventDefault();
             const btn = document.getElementById('btnEnviarSolicitud');
@@ -394,8 +394,7 @@
             };
 
             try {
-                const docRef = await addDoc(collection(db, "solicitudes"), nueva);
-                // Guardar ID en este navegador para vista privada
+                const docRef = await addDoc(collection(db, "solicitudes_musica"), nueva);
                 let misIds = JSON.parse(localStorage.getItem('mis_solicitudes_spumout') || '[]');
                 misIds.push(docRef.id);
                 localStorage.setItem('mis_solicitudes_spumout', JSON.stringify(misIds));
@@ -410,8 +409,8 @@
             }
         };
 
-        // ESCUCHAR SOLICITUDES EN TIEMPO REAL
-        onSnapshot(collection(db, "solicitudes"), (snapshot) => {
+        // ESCUCHAR SOLICITUDES EN TIEMPO REAL DESDE solicitudes_musica
+        onSnapshot(collection(db, "solicitudes_musica"), (snapshot) => {
             window.solicitudesCache = {};
             snapshot.forEach((docSnap) => {
                 window.solicitudesCache[docSnap.id] = { id: docSnap.id, ...docSnap.data() };
@@ -422,19 +421,17 @@
         function renderizarListas() {
             const todas = Object.values(window.solicitudesCache).sort((a, b) => (a.creadoEn || 0) - (b.creadoEn || 0));
 
-            const enProceso = todas.filter(s => s.estado === "proceso");
-            const vistas = todas.filter(s => s.estado === "vista");
-            const completadas = todas.filter(s => s.estado === "completada");
-            const enCola = todas.filter(s => !s.estado || s.estado === "cola");
+            const enProceso = todas.filter(s => s.estado === "proceso" || s.estado === "en_proceso");
+            const vistas = todas.filter(s => s.estado === "vista" || s.estado === "aceptada");
+            const completadas = todas.filter(s => s.estado === "completada" || s.estado === "completado");
+            const enCola = todas.filter(s => !s.estado || s.estado === "cola" || s.estado === "pendiente");
 
             document.getElementById('contadorCola').textContent = enCola.length;
 
-            // Renderizar 3 columnas superiores
-            renderColumna('listaProceso', enProceso, "Ninguna en producción ahora.", "amber");
-            renderColumna('listaVistas', vistas, "Ninguna marcada como vista.", "sky");
-            renderColumna('listaCompletadas', completadas, "Ninguna canción completada aún.", "emerald");
+            renderColumna('listaProceso', enProceso, "Ninguna en producción ahora.");
+            renderColumna('listaVistas', vistas, "Ninguna marcada como vista.");
+            renderColumna('listaCompletadas', completadas, "Ninguna canción completada aún.");
 
-            // Renderizar Cola
             const divCola = document.getElementById('listaCola');
             if (enCola.length === 0) {
                 divCola.innerHTML = `<p class="text-slate-500 text-xs italic text-center py-6 md:col-span-2">No hay solicitudes pendientes en la cola.</p>`;
@@ -442,7 +439,7 @@
                 divCola.innerHTML = enCola.map((s, index) => crearTarjeta(s, index + 1)).join('');
             }
 
-            // Renderizar Mi Solicitud Privada
+            // Mi Solicitud Privada
             const misIds = JSON.parse(localStorage.getItem('mis_solicitudes_spumout') || '[]');
             const mias = todas.filter(s => misIds.includes(s.id));
             const secPrivada = document.getElementById('seccionMiSolicitud');
@@ -450,40 +447,45 @@
 
             if (mias.length > 0) {
                 secPrivada.classList.remove('hidden');
-                contPrivada.innerHTML = mias.map(s => `
-                    <div class="bg-slate-900/90 border border-purple-500/30 rounded-xl p-4 flex flex-col md:flex-row justify-between gap-4">
-                        <div class="space-y-1 text-xs">
-                            <p class="text-sm font-bold text-white">${s.nombre} <span class="text-purple-400 font-normal">(${s.estilo})</span></p>
-                            <p class="text-slate-300"><strong class="text-slate-400">Para:</strong> ${s.destinatario} | <strong class="text-slate-400">Voz:</strong> ${s.voz}</p>
-                            <p class="text-slate-400">${s.detalles}</p>
-                            <p class="pt-1">
-                                <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-slate-800 text-amber-400 border border-amber-500/30">
-                                    Estado: ${traducirEstado(s.estado)}
-                                </span>
-                            </p>
+                contPrivada.innerHTML = mias.map(s => {
+                    const nombreCliente = s.nombre || s.usuario || "Usuario";
+                    const detallesTexto = s.detalles || s.historia || s.descripcion || "";
+                    const enlace = s.linkDescarga || s.urlDescarga || s.enlace || "";
+                    return `
+                        <div class="bg-slate-900/90 border border-purple-500/30 rounded-xl p-4 flex flex-col md:flex-row justify-between gap-4">
+                            <div class="space-y-1 text-xs">
+                                <p class="text-sm font-bold text-white">${nombreCliente} <span class="text-purple-400 font-normal">(${s.estilo || ''})</span></p>
+                                <p class="text-slate-300"><strong class="text-slate-400">Para:</strong> ${s.destinatario || '-'} | <strong class="text-slate-400">Voz:</strong> ${s.voz || '-'}</p>
+                                <p class="text-slate-400">${detallesTexto}</p>
+                                <p class="pt-1">
+                                    <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-slate-800 text-amber-400 border border-amber-500/30">
+                                        Estado: ${traducirEstado(s.estado)}
+                                    </span>
+                                </p>
+                            </div>
+                            <div class="flex items-center">
+                                ${enlace ? `
+                                    <a href="${enlace}" target="_blank" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-2 shadow">
+                                        <i class="fas fa-download"></i> Descargar Canción
+                                    </a>
+                                ` : `<span class="text-xs text-slate-500 italic">Descarga disponible al completar</span>`}
+                            </div>
                         </div>
-                        <div class="flex items-center">
-                            ${s.linkDescarga ? `
-                                <a href="${s.linkDescarga}" target="_blank" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-2 shadow">
-                                    <i class="fas fa-download"></i> Descargar Canción
-                                </a>
-                            ` : `<span class="text-xs text-slate-500 italic">Descarga disponible al completar</span>`}
-                        </div>
-                    </div>
-                `).join('');
+                    `;
+                }).join('');
             } else {
                 secPrivada.classList.add('hidden');
             }
         }
 
         function traducirEstado(est) {
-            if (est === "proceso") return "En Proceso";
-            if (est === "vista") return "Vista y Aceptada";
-            if (est === "completada") return "Completada";
+            if (est === "proceso" || est === "en_proceso") return "En Proceso";
+            if (est === "vista" || est === "aceptada") return "Vista y Aceptada";
+            if (est === "completada" || est === "completado") return "Completada";
             return "En Cola";
         }
 
-        function renderColumna(elementId, items, emptyMsg, color) {
+        function renderColumna(elementId, items, emptyMsg) {
             const el = document.getElementById(elementId);
             if (items.length === 0) {
                 el.innerHTML = `<p class="text-slate-500 text-xs italic text-center py-4">${emptyMsg}</p>`;
@@ -493,8 +495,11 @@
         }
 
         function crearTarjeta(s, numeroCola) {
-            const nombreMostrar = isAdmin ? s.nombre : enmascararNombre(s.nombre);
+            const nombreReal = s.nombre || s.usuario || "Usuario";
+            const nombreMostrar = isAdmin ? nombreReal : enmascararNombre(nombreReal);
             const badgeNum = numeroCola ? `<span class="bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded text-[11px] font-bold">#${numeroCola}</span>` : '';
+            const detallesTexto = s.detalles || s.historia || s.descripcion || "";
+            const fechaMostrar = s.fechaEvento || s.fechaLimite || s.fecha || "Sin fecha";
 
             let botonesAdmin = '';
             if (isAdmin) {
@@ -525,8 +530,8 @@
                         <span class="font-bold text-white text-sm flex items-center gap-2">${badgeNum} ${nombreMostrar}</span>
                         <span class="text-[11px] text-slate-400">${s.estilo || ''}</span>
                     </div>
-                    <p class="text-slate-400 text-[11px]">Plazo/Evento: <span class="text-slate-300">${s.fechaEvento || 'Sin fecha'}</span></p>
-                    ${isAdmin ? `<p class="text-slate-300 mt-1 line-clamp-2">${s.detalles}</p>` : ''}
+                    <p class="text-slate-400 text-[11px]">Plazo/Evento: <span class="text-slate-300">${fechaMostrar}</span></p>
+                    ${isAdmin ? `<p class="text-slate-300 mt-1 line-clamp-2">${detallesTexto}</p>` : ''}
                     ${botonesAdmin}
                 </div>
             `;
@@ -536,25 +541,30 @@
         window.verDetalles = function(id) {
             const s = window.solicitudesCache[id];
             if (!s) return;
+            const nombreReal = s.nombre || s.usuario || "Usuario";
+            const detallesTexto = s.detalles || s.historia || s.descripcion || "";
+            const fechaMostrar = s.fechaEvento || s.fechaLimite || s.fecha || "Sin fecha";
+            const enlace = s.linkDescarga || s.urlDescarga || s.enlace || "";
+
             document.getElementById('cuerpoModalAdmin').innerHTML = `
-                <p><strong class="text-amber-400">Cliente:</strong> ${s.nombre}</p>
-                <p><strong class="text-amber-400">Contacto:</strong> ${s.contacto}</p>
-                <p><strong class="text-amber-400">Para quién:</strong> ${s.destinatario}</p>
-                <p><strong class="text-amber-400">Estilo:</strong> ${s.estilo}</p>
-                <p><strong class="text-amber-400">Voz:</strong> ${s.voz}</p>
-                <p><strong class="text-amber-400">Fecha evento:</strong> ${s.fechaEvento}</p>
+                <p><strong class="text-amber-400">Cliente:</strong> ${nombreReal}</p>
+                <p><strong class="text-amber-400">Contacto:</strong> ${s.contacto || 'No indicado'}</p>
+                <p><strong class="text-amber-400">Para quién:</strong> ${s.destinatario || 'No indicado'}</p>
+                <p><strong class="text-amber-400">Estilo:</strong> ${s.estilo || ''}</p>
+                <p><strong class="text-amber-400">Voz:</strong> ${s.voz || ''}</p>
+                <p><strong class="text-amber-400">Fecha evento:</strong> ${fechaMostrar}</p>
                 <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 mt-2">
                     <strong class="text-amber-400 block mb-1">Detalles / Letra:</strong>
-                    <p class="whitespace-pre-line text-slate-300">${s.detalles}</p>
+                    <p class="whitespace-pre-line text-slate-300">${detallesTexto}</p>
                 </div>
-                ${s.linkDescarga ? `<p class="pt-2"><strong class="text-emerald-400">Enlace MP3:</strong> <a href="${s.linkDescarga}" target="_blank" class="underline text-sky-400 break-all">${s.linkDescarga}</a></p>` : ''}
+                ${enlace ? `<p class="pt-2"><strong class="text-emerald-400">Enlace MP3:</strong> <a href="${enlace}" target="_blank" class="underline text-sky-400 break-all">${enlace}</a></p>` : ''}
             `;
             document.getElementById('modalDetallesAdmin').classList.remove('hidden');
         };
 
         window.cambiarEstadoSolicitud = async function(id, nuevoEstado) {
             try {
-                await updateDoc(doc(db, "solicitudes", id), { estado: nuevoEstado });
+                await updateDoc(doc(db, "solicitudes_musica", id), { estado: nuevoEstado });
             } catch (e) {
                 alert("Error al actualizar: " + e.message);
             }
@@ -562,10 +572,11 @@
 
         window.completarSolicitud = async function(id) {
             const s = window.solicitudesCache[id];
-            const link = prompt("Pega aquí el enlace de descarga del MP3 (Google Drive, Dropbox, etc.):", s?.linkDescarga || "");
+            const enlaceActual = s?.linkDescarga || s?.urlDescarga || s?.enlace || "";
+            const link = prompt("Pega aquí el enlace de descarga del MP3 (Google Drive, Dropbox, etc.):", enlaceActual);
             if (link === null) return;
             try {
-                await updateDoc(doc(db, "solicitudes", id), {
+                await updateDoc(doc(db, "solicitudes_musica", id), {
                     estado: "completada",
                     linkDescarga: link.trim()
                 });
@@ -577,7 +588,7 @@
         window.eliminarSolicitud = async function(id) {
             if (!confirm("¿Seguro que quieres eliminar esta solicitud permanentemente?")) return;
             try {
-                await deleteDoc(doc(db, "solicitudes", id));
+                await deleteDoc(doc(db, "solicitudes_musica", id));
             } catch (e) {
                 alert("Error al eliminar: " + e.message);
             }
