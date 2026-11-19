@@ -3,254 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lista Música de IA - DJ Spumout</title>
+    <title>Lista Música de IA</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        body { background-color: #0b1120; color: #f8fafc; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .card-glass { background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(51, 65, 85, 0.7); backdrop-filter: blur(8px); }
-        .custom-scroll::-webkit-scrollbar { width: 6px; }
-        .custom-scroll::-webkit-scrollbar-track { background: #0f172a; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-    </style>
-</head>
-<body class="min-h-screen flex flex-col justify-between pb-12">
-
-    <!-- BOTÓN FLOTANTE ADMIN -->
-    <div class="fixed top-4 right-4 z-50">
-        <button id="btnAdminToggle" onclick="toggleAdmin()" class="bg-slate-800/90 hover:bg-slate-700 text-amber-400 border border-amber-500/40 px-4 py-2 rounded-full text-xs font-semibold shadow-lg transition flex items-center gap-2">
-            <i class="fas fa-crown"></i> <span id="adminBtnText">Acceso Admin</span>
-        </button>
-    </div>
-
-    <div class="max-w-6xl w-full mx-auto px-4 pt-10">
-        
-        <!-- CABECERA -->
-        <header class="text-center mb-8">
-            <h1 class="text-3xl md:text-4xl font-extrabold text-amber-400 flex items-center justify-center gap-3 mb-4">
-                <i class="fas fa-music"></i> Lista Música de IA
-            </h1>
-            <div class="flex flex-wrap justify-center gap-3 mb-5">
-                <a href="https://www.tiktok.com/@djspumout" target="_blank" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-4 py-1.5 rounded-full text-xs font-medium transition flex items-center gap-2">
-                    <i class="fab fa-tiktok text-pink-500"></i> Mi TikTok
-                </a>
-                <a href="https://about.me/djspumout" target="_blank" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-4 py-1.5 rounded-full text-xs font-medium transition flex items-center gap-2">
-                    <i class="fas fa-user text-amber-400"></i> Mi Información (about.me)
-                </a>
-                <button onclick="document.getElementById('modalInfo').classList.remove('hidden')" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-4 py-1.5 rounded-full text-xs font-medium transition flex items-center gap-2">
-                    <i class="fas fa-info-circle text-sky-400"></i> Sobre DJ Spumout
-                </button>
-            </div>
-
-            <!-- BADGE ESTADO PLAZA -->
-            <div id="badgeEstadoPlaza" class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold tracking-wider uppercase bg-red-950/80 text-red-400 border border-red-800/60">
-                <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span> CARGANDO ESTADO...
-            </div>
-        </header>
-
-        <!-- PANEL ADMIN (OCULTO POR DEFECTO) -->
-        <section id="panelAdmin" class="hidden mb-8 p-5 rounded-2xl border border-amber-500/40 bg-slate-900/95 shadow-2xl">
-            <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4 mb-4">
-                <h2 class="text-amber-400 font-bold text-sm flex items-center gap-2">
-                    <i class="fas fa-crown"></i> Panel DJ Spumout
-                </h2>
-                <button onclick="cerrarModoAdmin()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-xs border border-slate-700 flex items-center gap-2">
-                    <i class="fas fa-eye"></i> Ver Vista Público
-                </button>
-            </div>
-
-            <div class="flex flex-wrap items-center justify-between gap-4">
-                <div class="flex gap-2">
-                    <button onclick="cambiarEstadoPlaza(true)" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-lg text-xs transition flex items-center gap-2 shadow">
-                        <i class="fas fa-lock-open"></i> Abrir Plaza
-                    </button>
-                    <button onclick="cambiarEstadoPlaza(false)" class="bg-red-600 hover:bg-red-500 text-white font-bold px-4 py-2 rounded-lg text-xs transition flex items-center gap-2 shadow">
-                        <i class="fas fa-lock"></i> Cerrar Plaza
-                    </button>
-                </div>
-
-                <div class="flex flex-wrap items-center gap-2 bg-slate-950/70 p-2 rounded-xl border border-slate-800">
-                    <label class="text-xs text-slate-400">Inicio:</label>
-                    <input type="date" id="fechaInicio" class="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-lg px-2.5 py-1.5">
-                    <label class="text-xs text-slate-400 ml-1">Fin Cierre:</label>
-                    <input type="date" id="fechaFin" class="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-lg px-2.5 py-1.5">
-                    <button onclick="guardarFechasPlaza()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-3 py-1.5 rounded-lg text-xs transition">
-                        Guardar
-                    </button>
-                </div>
-            </div>
-        </section>
-
-        <!-- BLOQUE FORMULARIO O PLAZA CERRADA -->
-        <section class="mb-8">
-            <!-- VISTA PLAZA CERRADA -->
-            <div id="vistaPlazaCerrada" class="card-glass rounded-2xl p-8 text-center">
-                <i class="fas fa-lock text-4xl text-red-500 mb-3"></i>
-                <h2 class="text-xl font-bold text-white mb-1">Plazas actualmente cerradas</h2>
-                <p class="text-slate-400 text-sm">Permanece atento al directo de DJ Spumout para saber cuándo abre la próxima plaza.</p>
-                <p id="textoFechasCerrada" class="text-xs text-amber-400/90 mt-3 font-medium"></p>
-            </div>
-
-            <!-- VISTA FORMULARIO ABIERTO -->
-            <div id="vistaFormularioAbierto" class="hidden card-glass rounded-2xl p-6 md:p-8 border border-emerald-500/30">
-                <div class="flex flex-wrap justify-between items-center gap-2 mb-6 border-b border-slate-800 pb-4">
-                    <div>
-                        <h2 class="text-xl font-bold text-emerald-400 flex items-center gap-2">
-                            <i class="fas fa-edit"></i> Solicitar Canción Personalizada
-                        </h2>
-                        <p class="text-xs text-slate-400 mt-1">Rellena todos los detalles para que DJ Spumout produzca tu tema.</p>
-                    </div>
-                    <span id="textoFechasAbierta" class="text-xs bg-emerald-950/80 text-emerald-300 border border-emerald-700/50 px-3 py-1.5 rounded-lg"></span>
-                </div>
-
-                <form id="formSolicitud" onsubmit="enviarSolicitud(event)" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-300 mb-1">Tu Nombre o Usuario de TikTok *</label>
-                        <input type="text" id="inputNombre" required placeholder="Ej: @usuario o tu nombre" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-amber-400 focus:outline-none">
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-300 mb-1">¿Para quién es la canción? *</label>
-                        <input type="text" id="inputDestinatario" required placeholder="Ej: Para mí, para mi pareja, para mi madre..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-amber-400 focus:outline-none">
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-300 mb-1">Estilo Musical *</label>
-                        <select id="inputEstilo" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-amber-400 focus:outline-none">
-                            <option value="Flamenco Moderno / Rumba">Flamenco Moderno / Rumba</option>
-                            <option value="Sevillanas">Sevillanas</option>
-                            <option value="Reggaetón / Urbano">Reggaetón / Urbano</option>
-                            <option value="Pop Español / Balada">Pop Español / Balada</option>
-                            <option value="Bachata / Salsa">Bachata / Salsa</option>
-                            <option value="Electrónica / Hardstyle / Dance">Electrónica / Hardstyle / Dance</option>
-                            <option value="Rap / Hip-Hop">Rap / Hip-Hop</option>
-                            <option value="Otro estilo (indicar abajo)">Otro estilo (indicar abajo)</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-300 mb-1">Tipo de Voz *</label>
-                        <select id="inputVoz" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-amber-400 focus:outline-none">
-                            <option value="Voz Masculina">Voz Masculina</option>
-                            <option value="Voz Femenina">Voz Femenina</option>
-                            <option value="Dúo (Hombre y Mujer)">Dúo (Hombre y Mujer)</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-300 mb-1">Fecha Límite o Evento Especial (Opcional)</label>
-                        <input type="date" id="inputFechaEvento" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-amber-400 focus:outline-none">
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-300 mb-1">Contacto (TikTok / Telegram / WhatsApp) *</label>
-                        <input type="text" id="inputContacto" required placeholder="Para avisarte cuando esté lista" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-amber-400 focus:outline-none">
-                    </div>
-
-                    <div class="md:col-span-2">
-                        <label class="block text-xs font-semibold text-slate-300 mb-1">Historia, nombres, frases o detalles para la letra *</label>
-                        <textarea id="inputDetalles" required rows="3" placeholder="Cuéntame qué quieres que diga la canción, nombres importantes, anécdotas, tono (emotivo, divertido, romántico)..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-amber-400 focus:outline-none"></textarea>
-                    </div>
-
-                    <div class="md:col-span-2 flex justify-end">
-                        <button type="submit" id="btnEnviarSolicitud" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold px-6 py-3 rounded-xl text-sm transition flex items-center gap-2 shadow-lg">
-                            <i class="fas fa-paper-plane"></i> Enviar Solicitud a la Cola
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </section>
-
-        <!-- LAS 3 COLUMNAS DE ESTADO -->
-        <section class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10">
-            
-            <!-- 1. EN PROCESO ACTUALMENTE -->
-            <div class="card-glass rounded-2xl p-5 border border-amber-500/30 flex flex-col">
-                <h3 class="text-amber-400 font-bold text-xs uppercase tracking-wider flex items-center gap-2 mb-4 pb-2 border-b border-slate-800">
-                    <i class="fas fa-compact-disc fa-spin"></i> EN PROCESO ACTUALMENTE
-                </h3>
-                <div id="listaProceso" class="space-y-3 flex-1">
-                    <p class="text-slate-500 text-xs italic text-center py-4">Ninguna en producción ahora.</p>
-                </div>
-            </div>
-
-            <!-- 2. VISTAS Y ACEPTADAS -->
-            <div class="card-glass rounded-2xl p-5 border border-sky-500/30 flex flex-col">
-                <h3 class="text-sky-400 font-bold text-xs uppercase tracking-wider flex items-center gap-2 mb-4 pb-2 border-b border-slate-800">
-                    <i class="fas fa-check-circle"></i> VISTAS Y ACEPTADAS
-                </h3>
-                <div id="listaVistas" class="space-y-3 flex-1">
-                    <p class="text-slate-500 text-xs italic text-center py-4">Ninguna marcada como vista.</p>
-                </div>
-            </div>
-
-            <!-- 3. CANCIONES COMPLETADAS -->
-            <div class="card-glass rounded-2xl p-5 border border-emerald-500/30 flex flex-col">
-                <h3 class="text-emerald-400 font-bold text-xs uppercase tracking-wider flex items-center gap-2 mb-4 pb-2 border-b border-slate-800">
-                    <i class="fas fa-star"></i> CANCIONES COMPLETADAS
-                </h3>
-                <div id="listaCompletadas" class="space-y-3 flex-1">
-                    <p class="text-slate-500 text-xs italic text-center py-4">Ninguna canción completada aún.</p>
-                </div>
-            </div>
-
-        </section>
-
-        <!-- SOLICITUDES EN COLA -->
-        <section class="mb-10">
-            <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
-                <h3 class="text-amber-400 font-bold text-base flex items-center gap-2">
-                    <i class="fas fa-list-ol"></i> Solicitudes en Cola (<span id="contadorCola">0</span>)
-                </h3>
-                <span class="text-xs text-slate-400">Privacidad protegida</span>
-            </div>
-            <div id="listaCola" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <p class="text-slate-500 text-xs italic text-center py-6 md:col-span-2">No hay solicitudes pendientes en la cola.</p>
-            </div>
-        </section>
-
-        <!-- MI SOLICITUD PRIVADA (PARA EL USUARIO QUE ENVIÓ DESDE ESTE DISPOSITIVO) -->
-        <section id="seccionMiSolicitud" class="hidden card-glass rounded-2xl p-6 border border-purple-500/40 bg-purple-950/10">
-            <h3 class="text-purple-400 font-bold text-sm uppercase tracking-wider flex items-center gap-2 mb-4">
-                <i class="fas fa-user-shield"></i> Mi Solicitud Privada (Solo visible para ti)
-            </h3>
-            <div id="contenidoMiSolicitud" class="space-y-4"></div>
-        </section>
-
-    </div>
-
-    <!-- MODAL SOBRE DJ SPUMOUT -->
-    <div id="modalInfo" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-6 relative">
-            <button onclick="document.getElementById('modalInfo').classList.add('hidden')" class="absolute top-4 right-4 text-slate-400 hover:text-white">
-                <i class="fas fa-times text-lg"></i>
-            </button>
-            <h3 class="text-xl font-bold text-amber-400 mb-3 flex items-center gap-2">
-                <i class="fas fa-headphones"></i> Sobre DJ Spumout
-            </h3>
-            <p class="text-sm text-slate-300 leading-relaxed mb-4">
-                Creación de canciones 100% personalizadas con Inteligencia Artificial y producción musical profesional. Cada tema se compone a medida según tu historia, estilo y dedicatoria.
-            </p>
-            <p class="text-xs text-slate-400">
-                Sigue los directos en TikTok para enterarte cuando se abren nuevas plazas gratuitas o encargos especiales.
-            </p>
-        </div>
-    </div>
-
-    <!-- MODAL DETALLES ADMIN -->
-    <div id="modalDetallesAdmin" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-lg w-full p-6 relative">
-            <button onclick="document.getElementById('modalDetallesAdmin').classList.add('hidden')" class="absolute top-4 right-4 text-slate-400 hover:text-white">
-                <i class="fas fa-times text-lg"></i>
-            </button>
-            <h3 class="text-lg font-bold text-amber-400 mb-4 flex items-center gap-2">
-                <i class="fas fa-file-alt"></i> Ficha Completa de Solicitud
-            </h3>
-            <div id="cuerpoModalAdmin" class="space-y-2.5 text-sm text-slate-200 max-h-[70vh] overflow-y-auto custom-scroll pr-2"></div>
-        </div>
-    </div>
-
-    <!-- FIREBASE SDK Y LÓGICA -->
+    
+    <!-- Firebase SDK v10 -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, setDoc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
@@ -259,342 +16,867 @@
             apiKey: "AIzaSyBVEWu7BbvKF-xlCwTU8RxMlvRSA54BoqU",
             authDomain: "lista-musica-ia.firebaseapp.com",
             projectId: "lista-musica-ia",
-            storageBucket: "lista-musica-ia.firebasestorage.app",
-            messagingSenderId: "60825175129",
-            appId: "1:60825175129:web:ccd8dc08480074ca755d48"
+            storageBucket: "lista-musica-ia.appspot.com",
+            messagingSenderId: "1008568617319",
+            appId: "1:1008568617319:web:44c445c4c7df04724f887d"
         };
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
+        // Caché seguro en memoria para evitar ruptura de comillas en onclick
         window.solicitudesCache = {};
-        let isAdmin = sessionStorage.getItem('spumout_admin') === 'true';
 
-        // FUNCIÓN ENMASCARAR NOMBRE (Ej: Carlos -> C****s)
-        function enmascararNombre(nombre) {
-            if (!nombre) return "Usuario";
-            const limpio = nombre.trim();
-            if (limpio.length <= 2) return limpio[0] + "*";
-            return limpio[0] + "*".repeat(Math.min(limpio.length - 2, 5)) + limpio[limpio.length - 1];
+        // Identificador Privado Único por Cliente
+        let clientId = localStorage.getItem('dj_client_user_id');
+        if (!clientId) {
+            clientId = 'cli_' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+            localStorage.setItem('dj_client_user_id', clientId);
         }
 
-        // ACTUALIZAR INTERFAZ ADMIN
-        function actualizarVistaAdmin() {
-            const panel = document.getElementById('panelAdmin');
-            const btnText = document.getElementById('adminBtnText');
-            if (isAdmin) {
-                panel.classList.remove('hidden');
-                btnText.textContent = "Modo Administrador Activo";
-            } else {
-                panel.classList.add('hidden');
-                btnText.textContent = "Acceso Admin";
-            }
-            renderizarListas();
+        let plazaAbierta = false;
+        let esAdmin = sessionStorage.getItem('is_dj_admin') === 'true';
+        let fechaInicioGlobal = "";
+        let fechaFinPlazoGlobal = "";
+        let listaDocumentosActual = [];
+
+        function enmascararTexto(texto) {
+            if (!texto) return "***";
+            const limpio = String(texto).trim();
+            if (limpio.length <= 2) return limpio[0] + "***";
+            return limpio[0] + "***" + limpio[limpio.length - 1];
         }
 
-        window.toggleAdmin = function() {
-            if (isAdmin) {
-                const panel = document.getElementById('panelAdmin');
-                panel.classList.toggle('hidden');
-            } else {
-                const pass = prompt("Introduce la contraseña de Administrador:");
-                if (pass === "spumout2026") {
-                    isAdmin = true;
-                    sessionStorage.setItem('spumout_admin', 'true');
-                    actualizarVistaAdmin();
-                } else if (pass !== null) {
-                    alert("Contraseña incorrecta.");
-                }
-            }
-        };
+        function formatearFechaEsp(fechaStr) {
+            if (!fechaStr) return "";
+            const partes = String(fechaStr).split("-");
+            if (partes.length === 3) return `${partes[2]}/${partes[1]}/${partes[0]}`;
+            return fechaStr;
+        }
 
-        window.cerrarModoAdmin = function() {
-            isAdmin = false;
-            sessionStorage.removeItem('spumout_admin');
-            actualizarVistaAdmin();
-        };
+        function sumarDiasAFecha(fechaBaseStr, numDias = 20) {
+            const base = fechaBaseStr ? new Date(fechaBaseStr) : new Date();
+            base.setDate(base.getDate() + numDias);
+            return base.toISOString().split('T')[0];
+        }
 
-        // ESCUCHAR CONFIGURACIÓN DE PLAZA EN TIEMPO REAL (configuracion/estado_plaza)
-        const configRef = doc(db, "configuracion", "estado_plaza");
-        onSnapshot(configRef, (docSnap) => {
-            let abierta = false;
-            let inicio = "";
-            let fin = "";
+        function obtenerHoyISO() {
+            return new Date().toISOString().split('T')[0];
+        }
 
+        onSnapshot(doc(db, "configuracion", "estado_plaza"), (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
-                abierta = data.abierta === true;
-                inicio = data.fechaInicio || data.inicio || "";
-                fin = data.fechaFinPlazo || data.fin || "";
-            }
+                fechaInicioGlobal = data.fechaInicio || obtenerHoyISO();
+                fechaFinPlazoGlobal = data.fechaFinPlazo || sumarDiasAFecha(fechaInicioGlobal, 20);
+                plazaAbierta = Boolean(data.abierta);
 
-            document.getElementById('fechaInicio').value = inicio;
-            document.getElementById('fechaFin').value = fin;
-
-            const badge = document.getElementById('badgeEstadoPlaza');
-            const vistaCerrada = document.getElementById('vistaPlazaCerrada');
-            const vistaAbierta = document.getElementById('vistaFormularioAbierto');
-
-            if (abierta) {
-                badge.className = "inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold tracking-wider uppercase bg-emerald-950/80 text-emerald-400 border border-emerald-700/60";
-                badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> PLAZA ABIERTA`;
-                vistaCerrada.classList.add('hidden');
-                vistaAbierta.classList.remove('hidden');
-                if (inicio && fin) {
-                    document.getElementById('textoFechasAbierta').textContent = `Plazo: ${inicio} al ${fin}`;
+                // Cierre automático si ya pasó la fecha de Fin Cierre
+                if (plazaAbierta && fechaFinPlazoGlobal && obtenerHoyISO() > fechaFinPlazoGlobal) {
+                    plazaAbierta = false;
+                    guardarEstadoPlazaBD(false, fechaInicioGlobal, fechaFinPlazoGlobal);
                 }
             } else {
-                badge.className = "inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold tracking-wider uppercase bg-red-950/80 text-red-400 border border-red-800/60";
-                badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-red-500"></span> PLAZA CERRADA`;
-                vistaAbierta.classList.add('hidden');
-                vistaCerrada.classList.remove('hidden');
-                if (inicio && fin) {
-                    document.getElementById('textoFechasCerrada').textContent = `Periodo programado: ${inicio} al ${fin}`;
-                }
+                plazaAbierta = false;
+                fechaInicioGlobal = obtenerHoyISO();
+                fechaFinPlazoGlobal = sumarDiasAFecha(fechaInicioGlobal, 20);
             }
+            actualizarInterfaz();
         });
 
-        window.cambiarEstadoPlaza = async function(estado) {
-            try {
-                await setDoc(configRef, { abierta: estado }, { merge: true });
-            } catch (e) {
-                alert("Error al cambiar el estado de la plaza: " + e.message);
-            }
-        };
-
-        window.guardarFechasPlaza = async function() {
-            const fechaInicio = document.getElementById('fechaInicio').value;
-            const fechaFinPlazo = document.getElementById('fechaFin').value;
-            try {
-                await setDoc(configRef, { fechaInicio, fechaFinPlazo }, { merge: true });
-                alert("Fechas guardadas correctamente.");
-            } catch (e) {
-                alert("Error al guardar fechas: " + e.message);
-            }
-        };
-
-        // ENVIAR NUEVA SOLICITUD A solicitudes_musica
-        window.enviarSolicitud = async function(e) {
-            e.preventDefault();
-            const btn = document.getElementById('btnEnviarSolicitud');
-            btn.disabled = true;
-            btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Enviando...`;
-
-            const nueva = {
-                nombre: document.getElementById('inputNombre').value.trim(),
-                destinatario: document.getElementById('inputDestinatario').value.trim(),
-                estilo: document.getElementById('inputEstilo').value,
-                voz: document.getElementById('inputVoz').value,
-                fechaEvento: document.getElementById('inputFechaEvento').value || "Sin fecha fija",
-                contacto: document.getElementById('inputContacto').value.trim(),
-                detalles: document.getElementById('inputDetalles').value.trim(),
-                estado: "cola",
-                linkDescarga: "",
-                creadoEn: Date.now()
-            };
-
-            try {
-                const docRef = await addDoc(collection(db, "solicitudes_musica"), nueva);
-                let misIds = JSON.parse(localStorage.getItem('mis_solicitudes_spumout') || '[]');
-                misIds.push(docRef.id);
-                localStorage.setItem('mis_solicitudes_spumout', JSON.stringify(misIds));
-
-                document.getElementById('formSolicitud').reset();
-                alert("¡Solicitud enviada con éxito! Puedes ver su estado abajo.");
-            } catch (err) {
-                alert("Error al enviar solicitud: " + err.message);
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = `<i class="fas fa-paper-plane"></i> Enviar Solicitud a la Cola`;
-            }
-        };
-
-        // ESCUCHAR SOLICITUDES EN TIEMPO REAL DESDE solicitudes_musica
+        // Lectura directa sin orderBy en Firestore para NO excluir registros antiguos sin campo 'creado'
         onSnapshot(collection(db, "solicitudes_musica"), (snapshot) => {
+            const docs = [];
             window.solicitudesCache = {};
-            snapshot.forEach((docSnap) => {
-                window.solicitudesCache[docSnap.id] = { id: docSnap.id, ...docSnap.data() };
+            snapshot.forEach((docItem) => {
+                const data = docItem.data();
+                window.solicitudesCache[docItem.id] = data;
+                docs.push({ id: docItem.id, data: data });
             });
+            // Ordenar en cliente de más reciente a más antiguo (los antiguos sin 'creado' van al final sin perderse)
+            docs.sort((a, b) => (b.data.creado || 0) - (a.data.creado || 0));
+            listaDocumentosActual = docs;
             renderizarListas();
         });
 
-        function renderizarListas() {
-            const todas = Object.values(window.solicitudesCache).sort((a, b) => (a.creadoEn || 0) - (b.creadoEn || 0));
+        function generarBotonesAdmin(id, enProceso, vista, completada) {
+            if (!esAdmin) return '';
 
-            const enProceso = todas.filter(s => s.estado === "proceso" || s.estado === "en_proceso");
-            const vistas = todas.filter(s => s.estado === "vista" || s.estado === "aceptada");
-            const completadas = todas.filter(s => s.estado === "completada" || s.estado === "completado");
-            const enCola = todas.filter(s => !s.estado || s.estado === "cola" || s.estado === "pendiente");
-
-            document.getElementById('contadorCola').textContent = enCola.length;
-
-            renderColumna('listaProceso', enProceso, "Ninguna en producción ahora.");
-            renderColumna('listaVistas', vistas, "Ninguna marcada como vista.");
-            renderColumna('listaCompletadas', completadas, "Ninguna canción completada aún.");
-
-            const divCola = document.getElementById('listaCola');
-            if (enCola.length === 0) {
-                divCola.innerHTML = `<p class="text-slate-500 text-xs italic text-center py-6 md:col-span-2">No hay solicitudes pendientes en la cola.</p>`;
+            let btnProceso = '';
+            if (enProceso) {
+                btnProceso = `
+                    <button type="button" onclick="completarCancion('${id}')" class="text-green-300 bg-green-900/70 hover:bg-green-800 border border-green-500/60 text-[11px] px-2 py-1 rounded font-bold transition cursor-pointer">
+                        <i class="fa-solid fa-check"></i> Completar
+                    </button>
+                    <button type="button" onclick="cambiarEstado('${id}', 'enProceso', false)" class="text-amber-300 bg-amber-900/60 hover:bg-amber-800 border border-amber-500/60 text-[11px] px-2 py-1 rounded font-bold transition cursor-pointer">
+                        <i class="fa-solid fa-undo"></i> Quitar
+                    </button>`;
             } else {
-                divCola.innerHTML = enCola.map((s, index) => crearTarjeta(s, index + 1)).join('');
+                btnProceso = `
+                    <button type="button" onclick="cambiarEstado('${id}', 'enProceso', true)" class="text-slate-300 hover:text-amber-300 bg-slate-900 border border-slate-700 text-[11px] px-2 py-1 rounded transition cursor-pointer">
+                        <i class="fa-solid fa-play"></i> En Proceso
+                    </button>`;
             }
 
-            // Mi Solicitud Privada
-            const misIds = JSON.parse(localStorage.getItem('mis_solicitudes_spumout') || '[]');
-            const mias = todas.filter(s => misIds.includes(s.id));
-            const secPrivada = document.getElementById('seccionMiSolicitud');
-            const contPrivada = document.getElementById('contenidoMiSolicitud');
-
-            if (mias.length > 0) {
-                secPrivada.classList.remove('hidden');
-                contPrivada.innerHTML = mias.map(s => {
-                    const nombreCliente = s.nombre || s.usuario || "Usuario";
-                    const detallesTexto = s.detalles || s.historia || s.descripcion || "";
-                    const enlace = s.linkDescarga || s.urlDescarga || s.enlace || "";
-                    return `
-                        <div class="bg-slate-900/90 border border-purple-500/30 rounded-xl p-4 flex flex-col md:flex-row justify-between gap-4">
-                            <div class="space-y-1 text-xs">
-                                <p class="text-sm font-bold text-white">${nombreCliente} <span class="text-purple-400 font-normal">(${s.estilo || ''})</span></p>
-                                <p class="text-slate-300"><strong class="text-slate-400">Para:</strong> ${s.destinatario || '-'} | <strong class="text-slate-400">Voz:</strong> ${s.voz || '-'}</p>
-                                <p class="text-slate-400">${detallesTexto}</p>
-                                <p class="pt-1">
-                                    <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-slate-800 text-amber-400 border border-amber-500/30">
-                                        Estado: ${traducirEstado(s.estado)}
-                                    </span>
-                                </p>
-                            </div>
-                            <div class="flex items-center">
-                                ${enlace ? `
-                                    <a href="${enlace}" target="_blank" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-2 shadow">
-                                        <i class="fas fa-download"></i> Descargar Canción
-                                    </a>
-                                ` : `<span class="text-xs text-slate-500 italic">Descarga disponible al completar</span>`}
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-            } else {
-                secPrivada.classList.add('hidden');
-            }
-        }
-
-        function traducirEstado(est) {
-            if (est === "proceso" || est === "en_proceso") return "En Proceso";
-            if (est === "vista" || est === "aceptada") return "Vista y Aceptada";
-            if (est === "completada" || est === "completado") return "Completada";
-            return "En Cola";
-        }
-
-        function renderColumna(elementId, items, emptyMsg) {
-            const el = document.getElementById(elementId);
-            if (items.length === 0) {
-                el.innerHTML = `<p class="text-slate-500 text-xs italic text-center py-4">${emptyMsg}</p>`;
-            } else {
-                el.innerHTML = items.map(s => crearTarjeta(s, null)).join('');
-            }
-        }
-
-        function crearTarjeta(s, numeroCola) {
-            const nombreReal = s.nombre || s.usuario || "Usuario";
-            const nombreMostrar = isAdmin ? nombreReal : enmascararNombre(nombreReal);
-            const badgeNum = numeroCola ? `<span class="bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded text-[11px] font-bold">#${numeroCola}</span>` : '';
-            const detallesTexto = s.detalles || s.historia || s.descripcion || "";
-            const fechaMostrar = s.fechaEvento || s.fechaLimite || s.fecha || "Sin fecha";
-
-            let botonesAdmin = '';
-            if (isAdmin) {
-                botonesAdmin = `
-                    <div class="mt-3 pt-2.5 border-t border-slate-800 flex flex-wrap gap-1.5">
-                        <button onclick="verDetalles('${s.id}')" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1 rounded text-[11px]" title="Ver ficha">
-                            <i class="fas fa-eye"></i> Ficha
-                        </button>
-                        <button onclick="cambiarEstadoSolicitud('${s.id}', 'vista')" class="bg-sky-900/70 hover:bg-sky-800 text-sky-300 px-2.5 py-1 rounded text-[11px]">
-                            Vista
-                        </button>
-                        <button onclick="cambiarEstadoSolicitud('${s.id}', 'proceso')" class="bg-amber-900/70 hover:bg-amber-800 text-amber-300 px-2.5 py-1 rounded text-[11px]">
-                            Proceso
-                        </button>
-                        <button onclick="completarSolicitud('${s.id}')" class="bg-emerald-900/70 hover:bg-emerald-800 text-emerald-300 px-2.5 py-1 rounded text-[11px]">
-                            Completar
-                        </button>
-                        <button onclick="eliminarSolicitud('${s.id}')" class="bg-red-900/70 hover:bg-red-800 text-red-300 px-2.5 py-1 rounded text-[11px] ml-auto">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                `;
+            let btnVista = '';
+            if (!enProceso && !completada) {
+                btnVista = vista
+                    ? `<button type="button" onclick="cambiarEstado('${id}', 'vista', false)" class="text-sky-300 bg-sky-900/60 hover:bg-sky-800 border border-sky-500/60 text-[11px] px-2 py-1 rounded font-bold transition cursor-pointer">
+                         <i class="fa-solid fa-eye-slash"></i> Quitar Vista
+                       </button>`
+                    : `<button type="button" onclick="cambiarEstado('${id}', 'vista', true)" class="text-slate-300 hover:text-sky-300 bg-slate-900 border border-slate-700 text-[11px] px-2 py-1 rounded transition cursor-pointer">
+                         <i class="fa-solid fa-eye"></i> Marcar Vista
+                       </button>`;
             }
 
             return `
-                <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 text-xs">
-                    <div class="flex items-center justify-between gap-2 mb-1">
-                        <span class="font-bold text-white text-sm flex items-center gap-2">${badgeNum} ${nombreMostrar}</span>
-                        <span class="text-[11px] text-slate-400">${s.estilo || ''}</span>
-                    </div>
-                    <p class="text-slate-400 text-[11px]">Plazo/Evento: <span class="text-slate-300">${fechaMostrar}</span></p>
-                    ${isAdmin ? `<p class="text-slate-300 mt-1 line-clamp-2">${detallesTexto}</p>` : ''}
-                    ${botonesAdmin}
-                </div>
-            `;
+                <div class="flex items-center gap-1 flex-wrap pt-1">
+                    ${btnProceso}
+                    ${btnVista}
+                    <button type="button" onclick="agregarEnlaceDescarga('${id}')" class="text-green-400 hover:text-green-300 text-[11px] bg-green-950/60 border border-green-800/60 px-2 py-1 rounded transition cursor-pointer">
+                        <i class="fa-solid fa-link"></i> Link Descarga
+                    </button>
+                    <button type="button" onclick="copiarFichaIA('${id}')" class="text-amber-400 hover:text-amber-300 text-[11px] bg-amber-950/50 border border-amber-800/60 px-2 py-1 rounded transition cursor-pointer" title="Copiar Ficha">
+                        <i class="fa-solid fa-copy"></i> Copiar
+                    </button>
+                    <button type="button" onclick="borrarSolicitud('${id}')" class="text-red-400 hover:text-red-300 text-[11px] bg-red-950/60 border border-red-800/60 px-2 py-1 rounded transition cursor-pointer" title="Eliminar">
+                        <i class="fa-solid fa-trash"></i> Eliminar
+                    </button>
+                </div>`;
         }
 
-        // ACCIONES ADMIN
-        window.verDetalles = function(id) {
-            const s = window.solicitudesCache[id];
-            if (!s) return;
-            const nombreReal = s.nombre || s.usuario || "Usuario";
-            const detallesTexto = s.detalles || s.historia || s.descripcion || "";
-            const fechaMostrar = s.fechaEvento || s.fechaLimite || s.fecha || "Sin fecha";
-            const enlace = s.linkDescarga || s.urlDescarga || s.enlace || "";
+        function generarDetallesAdmin(data) {
+            if (!esAdmin) return '';
+            return `
+                <div class="bg-slate-900/90 p-2.5 rounded-lg border border-amber-500/30 text-[11px] text-slate-300 space-y-1 mt-2">
+                    <p class="text-amber-400 font-bold border-b border-slate-800 pb-1 mb-1"><i class="fa-solid fa-user-lock mr-1"></i>Detalles Reservados (Admin):</p>
+                    ${data.estiloMusica ? `<p><strong class="text-slate-200">Estilo:</strong> ${data.estiloMusica} | <strong>Tono:</strong> ${data.tonoMensaje || 'N/A'}</p>` : ''}
+                    ${data.personalidad ? `<p><strong class="text-slate-200">Carácter:</strong> ${data.personalidad}</p>` : ''}
+                    ${data.gustos ? `<p><strong class="text-slate-200">Gustos:</strong> ${data.gustos}</p>` : ''}
+                    ${data.anecdota ? `<p><strong class="text-slate-200">Anécdota:</strong> ${data.anecdota}</p>` : ''}
+                    ${data.downloadUrl ? `<p class="text-green-400 truncate"><strong class="text-slate-200">Link activo:</strong> ${data.downloadUrl}</p>` : ''}
+                </div>`;
+        }
 
-            document.getElementById('cuerpoModalAdmin').innerHTML = `
-                <p><strong class="text-amber-400">Cliente:</strong> ${nombreReal}</p>
-                <p><strong class="text-amber-400">Contacto:</strong> ${s.contacto || 'No indicado'}</p>
-                <p><strong class="text-amber-400">Para quién:</strong> ${s.destinatario || 'No indicado'}</p>
-                <p><strong class="text-amber-400">Estilo:</strong> ${s.estilo || ''}</p>
-                <p><strong class="text-amber-400">Voz:</strong> ${s.voz || ''}</p>
-                <p><strong class="text-amber-400">Fecha evento:</strong> ${fechaMostrar}</p>
-                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 mt-2">
-                    <strong class="text-amber-400 block mb-1">Detalles / Letra:</strong>
-                    <p class="whitespace-pre-line text-slate-300">${detallesTexto}</p>
-                </div>
-                ${enlace ? `<p class="pt-2"><strong class="text-emerald-400">Enlace MP3:</strong> <a href="${enlace}" target="_blank" class="underline text-sky-400 break-all">${enlace}</a></p>` : ''}
-            `;
-            document.getElementById('modalDetallesAdmin').classList.remove('hidden');
-        };
+        function renderizarListas() {
+            const contenedorProceso = document.getElementById('listaEnProceso');
+            const contenedorVistas = document.getElementById('listaVistas');
+            const contenedorCompletadas = document.getElementById('listaCompletadas');
+            const contenedorColaPublica = document.getElementById('listaSolicitudesCola');
+            const contenedorMisSolicitudes = document.getElementById('listaMisSolicitudes');
+            const contadorContenedor = document.getElementById('contadorSolicitudes');
+            const seccionDestacados = document.getElementById('seccionDestacadosTresColumnas');
+            
+            contenedorProceso.innerHTML = '';
+            contenedorVistas.innerHTML = '';
+            contenedorCompletadas.innerHTML = '';
+            contenedorColaPublica.innerHTML = '';
+            contenedorMisSolicitudes.innerHTML = '';
 
-        window.cambiarEstadoSolicitud = async function(id, nuevoEstado) {
-            try {
-                await updateDoc(doc(db, "solicitudes_musica", id), { estado: nuevoEstado });
-            } catch (e) {
-                alert("Error al actualizar: " + e.message);
+            let hayEnProceso = false;
+            let hayVistas = false;
+            let hayCompletadas = false;
+            let totalEnCola = 0;
+            let misSolicitudesCount = 0;
+
+            listaDocumentosActual.forEach((item) => {
+                const id = item.id;
+                const data = item.data;
+                
+                // Normalización estricta de estados para soportar registros antiguos y nuevos
+                const enProceso = data.enProceso === true;
+                const completada = data.completada === true;
+                const vista = data.vista === true && !enProceso && !completada;
+                const enCola = !enProceso && !completada && !vista;
+                const esMio = data.clientId === clientId;
+
+                if (enProceso) hayEnProceso = true;
+                if (vista) hayVistas = true;
+                if (completada) hayCompletadas = true;
+                if (enCola) totalEnCola++;
+
+                const nombreMostrar = esAdmin ? (data.nombre || 'Sin nombre') : enmascararTexto(data.nombre);
+                const perfilMostrar = esAdmin ? (data.perfil || '') : enmascararTexto(data.perfil);
+                const accionesAdminHtml = generarBotonesAdmin(id, enProceso, vista, completada);
+                const detallesAdminHtml = generarDetallesAdmin(data);
+
+                // 1. RENDERIZAR EN LAS 3 LISTAS DESTACADAS (En Proceso / Vistas / Completadas)
+                if (!enCola) {
+                    const cardDestacada = document.createElement('div');
+                    cardDestacada.className = enProceso 
+                        ? "bg-amber-950/40 border-2 border-amber-500/80 rounded-xl p-3.5 space-y-2 shadow-2xl"
+                        : (completada ? "bg-green-950/40 border-2 border-green-500/80 rounded-xl p-3.5 space-y-2 shadow-xl"
+                                     : "bg-sky-950/40 border-2 border-sky-500/80 rounded-xl p-3.5 space-y-2 shadow-xl");
+                    
+                    let badgeEstado = '';
+                    if (enProceso) {
+                        badgeEstado = `<span class="bg-amber-500 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider inline-flex items-center gap-1"><i class="fa-solid fa-compact-disc animate-spin"></i> Produciendo</span>`;
+                    } else if (completada) {
+                        badgeEstado = `<span class="bg-green-500 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider inline-flex items-center gap-1"><i class="fa-solid fa-check"></i> Lista</span>`;
+                    } else if (vista) {
+                        badgeEstado = `<span class="bg-sky-500 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider inline-flex items-center gap-1"><i class="fa-solid fa-check-double"></i> Vista</span>`;
+                    }
+
+                    cardDestacada.innerHTML = `
+                        <div class="flex justify-between items-start gap-1 flex-wrap">
+                            <div>
+                                <span class="text-amber-400 font-bold text-sm block">${nombreMostrar}</span>
+                                ${esAdmin && perfilMostrar ? `<span class="text-slate-400 text-[11px] block">${perfilMostrar}</span>` : ''}
+                            </div>
+                            ${badgeEstado}
+                        </div>
+                        <p class="text-[11px] text-slate-400"><i class="fa-solid fa-calendar-day mr-1"></i>Plazo: ${formatearFechaEsp(data.fechaInicio)} al ${formatearFechaEsp(data.fechaFin)}</p>
+                        ${accionesAdminHtml}
+                        ${detallesAdminHtml}
+                    `;
+
+                    if (enProceso) contenedorProceso.appendChild(cardDestacada);
+                    else if (completada) contenedorCompletadas.appendChild(cardDestacada);
+                    else if (vista) contenedorVistas.appendChild(cardDestacada);
+                } 
+                // 2. RENDERIZAR EN 'SOLICITUDES EN COLA'
+                else {
+                    const cardCola = document.createElement('div');
+                    cardCola.className = "bg-slate-800 border border-slate-700 rounded-xl p-3.5 space-y-2 shadow-lg relative";
+
+                    cardCola.innerHTML = `
+                        <div class="flex justify-between items-start flex-wrap gap-1.5">
+                            <div>
+                                <span class="text-amber-400 font-bold text-base">${nombreMostrar}</span>
+                                <span class="text-slate-400 text-[11px] block">${perfilMostrar}</span>
+                            </div>
+                            ${accionesAdminHtml}
+                        </div>
+                        <div class="bg-slate-900/60 p-2 rounded-lg border border-slate-700/50 text-[11px] text-slate-300 mt-1.5">
+                            <p><strong class="text-amber-400"><i class="fa-solid fa-calendar-day mr-1"></i>Plazo:</strong> ${formatearFechaEsp(data.fechaInicio)} al ${formatearFechaEsp(data.fechaFin)}</p>
+                        </div>
+                        ${detallesAdminHtml}
+                    `;
+                    contenedorColaPublica.appendChild(cardCola);
+                }
+
+                // 3. VISTA PRIVADA INDIVIDUAL DEL CLIENTE
+                if (esMio) {
+                    misSolicitudesCount++;
+                    const cardCliente = document.createElement('div');
+                    cardCliente.className = "bg-slate-800 border border-amber-500/50 rounded-xl p-4 space-y-3 shadow-xl";
+
+                    let estadoClienteText = "📋 Recibida en Cola";
+                    if (enProceso) estadoClienteText = "🟡 En Proceso de Producción";
+                    else if (completada) estadoClienteText = "🎉 Canción Terminada";
+                    else if (vista) estadoClienteText = "👀 Vista y Aceptada por el DJ";
+
+                    let botonDescargaHtml = '';
+                    if (data.downloadUrl) {
+                        botonDescargaHtml = `
+                            <div class="bg-green-950/50 border border-green-500/60 p-3 rounded-lg text-center space-y-2">
+                                <p class="text-xs text-green-300 font-bold"><i class="fa-solid fa-circle-check mr-1"></i>¡Tu canción está lista!</p>
+                                <a href="${data.downloadUrl}" target="_blank" download class="inline-flex items-center gap-2 bg-green-500 hover:bg-green-400 text-slate-950 text-xs font-extrabold px-4 py-2 rounded-lg transition shadow-md">
+                                    <i class="fa-solid fa-download"></i> Descargar Canción
+                                </a>
+                            </div>`;
+                    }
+
+                    cardCliente.innerHTML = `
+                        <div class="flex justify-between items-center border-b border-slate-700 pb-2">
+                            <span class="text-amber-400 font-bold text-base">Para: ${data.nombre}</span>
+                            <span class="text-xs text-amber-300 font-semibold">${estadoClienteText}</span>
+                        </div>
+                        <p class="text-xs text-slate-300"><strong class="text-slate-400">Estilo pedido:</strong> ${data.estiloMusica || 'N/A'}</p>
+                        <p class="text-xs text-slate-400"><i class="fa-solid fa-calendar-day mr-1"></i>Plazo de entrega: ${formatearFechaEsp(data.fechaInicio)} al ${formatearFechaEsp(data.fechaFin)}</p>
+                        ${botonDescargaHtml}
+                    `;
+                    contenedorMisSolicitudes.appendChild(cardCliente);
+                }
+            });
+
+            // Actualizar contador real
+            if (contadorContenedor) {
+                contadorContenedor.innerText = `(${totalEnCola})`;
+            }
+
+            if (hayEnProceso || hayVistas || hayCompletadas || esAdmin) {
+                seccionDestacados.classList.remove('hidden');
+            } else {
+                seccionDestacados.classList.add('hidden');
+            }
+
+            if (contenedorProceso.children.length === 0) {
+                contenedorProceso.innerHTML = `<div class="text-center text-slate-500 py-3 text-xs italic">Ninguna en producción ahora.</div>`;
+            }
+            if (contenedorVistas.children.length === 0) {
+                contenedorVistas.innerHTML = `<div class="text-center text-slate-500 py-3 text-xs italic">Ninguna marcada como vista.</div>`;
+            }
+            if (contenedorCompletadas.children.length === 0) {
+                contenedorCompletadas.innerHTML = `<div class="text-center text-slate-500 py-3 text-xs italic">Ninguna canción completada aún.</div>`;
+            }
+            if (contenedorColaPublica.children.length === 0) {
+                contenedorColaPublica.innerHTML = `<div class="text-center text-slate-500 py-6 text-xs">No hay solicitudes pendientes en la cola.</div>`;
+            }
+            if (misSolicitudesCount === 0) {
+                contenedorMisSolicitudes.innerHTML = `<div class="text-center text-slate-500 py-6 text-xs">No tienes ninguna solicitud enviada por ahora.</div>`;
+            }
+        }
+
+        // --- FUNCIONES DE ADMINISTRACIÓN ENLAZADAS A FIREBASE ---
+
+        window.completarCancion = async function(id) {
+            if (!esAdmin) return;
+            const datosActuales = window.solicitudesCache[id] || {};
+            const url = prompt("Introduce el enlace directo de descarga para la canción terminada:", datosActuales.downloadUrl || "");
+            if (url !== null && url.trim() !== "") {
+                try {
+                    await updateDoc(doc(db, "solicitudes_musica", id), {
+                        enProceso: false,
+                        vista: false,
+                        completada: true,
+                        downloadUrl: url.trim()
+                    });
+                } catch (e) {
+                    console.error("Error al completar:", e);
+                    alert("Error al actualizar en Firebase: " + e.message);
+                }
             }
         };
 
-        window.completarSolicitud = async function(id) {
-            const s = window.solicitudesCache[id];
-            const enlaceActual = s?.linkDescarga || s?.urlDescarga || s?.enlace || "";
-            const link = prompt("Pega aquí el enlace de descarga del MP3 (Google Drive, Dropbox, etc.):", enlaceActual);
-            if (link === null) return;
+        window.agregarEnlaceDescarga = async function(id) {
+            if (!esAdmin) return;
+            const datosActuales = window.solicitudesCache[id] || {};
+            const url = prompt("Introduce el enlace directo de descarga para la canción (MP3/Drive/Dropbox):", datosActuales.downloadUrl || "");
+            if (url !== null) {
+                try {
+                    await updateDoc(doc(db, "solicitudes_musica", id), { 
+                        downloadUrl: url.trim() 
+                    });
+                    alert("Enlace actualizado correctamente.");
+                } catch (e) {
+                    console.error("Error al guardar link:", e);
+                    alert("Error al guardar enlace: " + e.message);
+                }
+            }
+        };
+
+        window.cambiarEstado = async function(id, campo, estado) {
+            if (!esAdmin) return;
             try {
-                await updateDoc(doc(db, "solicitudes_musica", id), {
-                    estado: "completada",
-                    linkDescarga: link.trim()
+                let actualizacion = {};
+                actualizacion[campo] = estado;
+                if (campo === 'enProceso' && estado === true) {
+                    actualizacion['vista'] = false;
+                    actualizacion['completada'] = false;
+                }
+                if (campo === 'vista' && estado === true) {
+                    actualizacion['enProceso'] = false;
+                    actualizacion['completada'] = false;
+                }
+                await updateDoc(doc(db, "solicitudes_musica", id), actualizacion);
+            } catch (e) {
+                console.error("Error cambiando estado:", e);
+                alert("Error al cambiar el estado: " + e.message);
+            }
+        };
+
+        window.copiarFichaIA = function(id) {
+            const data = window.solicitudesCache[id];
+            if (!data) return;
+
+            const textoFicha = `CREAR CANCIÓN DE IA PARA: ${data.nombre || 'Sin nombre'} (${data.perfil || 'Sin perfil'})
+Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
+----------------------------------------------
+- Edad/Cumpleaños: ${data.edadCumple || 'N/A'}
+- Relación: ${data.relacion || 'N/A'}
+- Personalidad: ${data.personalidad || 'N/A'}
+- Gustos: ${data.gustos || 'N/A'}
+- Frase típica: ${data.fraseTipica || 'N/A'}
+- Anécdota: ${data.anecdota || 'N/A'}
+- Qué le hace especial: ${data.queLeHaceEspecial || 'N/A'}
+- Tono deseado: ${data.tonoMensaje || 'N/A'}
+- Estilo musical: ${data.estiloMusica || 'N/A'}`;
+
+            navigator.clipboard.writeText(textoFicha).then(() => {
+                alert("¡Ficha copiada al portapapeles!");
+            }).catch(err => {
+                console.error("Error al copiar:", err);
+                alert("No se pudo copiar automáticamente.");
+            });
+        };
+
+        window.borrarSolicitud = async function(id) {
+            if (!esAdmin) return;
+            if (confirm("¿Seguro que deseas eliminar definitivamente esta solicitud?")) {
+                try {
+                    await deleteDoc(doc(db, "solicitudes_musica", id));
+                } catch (e) {
+                    console.error("Error eliminando:", e);
+                    alert("Error al eliminar: " + e.message);
+                }
+            }
+        };
+
+        // --- CONTROL DE LOGIN Y PLAZA ---
+
+        window.abrirModalAdmin = function() {
+            if (esAdmin) {
+                esAdmin = false;
+                sessionStorage.removeItem('is_dj_admin');
+                actualizarInterfaz();
+                renderizarListas();
+                return;
+            }
+            document.getElementById('modalLoginAdmin').classList.remove('hidden');
+            document.getElementById('modalLoginAdmin').classList.add('flex');
+        };
+
+        window.cerrarModalAdmin = function() {
+            document.getElementById('modalLoginAdmin').classList.add('hidden');
+            document.getElementById('modalLoginAdmin').classList.remove('flex');
+            document.getElementById('claveAdminInput').value = '';
+        };
+
+        window.verificarClaveAdmin = function(e) {
+            e.preventDefault();
+            if (document.getElementById('claveAdminInput').value === "spumout2026") {
+                esAdmin = true;
+                sessionStorage.setItem('is_dj_admin', 'true');
+                cerrarModalAdmin();
+                actualizarInterfaz();
+                renderizarListas();
+            } else { alert("Contraseña incorrecta."); }
+        };
+
+        window.cambiarEstadoPlaza = async function(nuevoEstado) {
+            if (!esAdmin) return;
+            if (nuevoEstado) {
+                fechaInicioGlobal = obtenerHoyISO();
+                fechaFinPlazoGlobal = sumarDiasAFecha(fechaInicioGlobal, 20);
+                await guardarEstadoPlazaBD(true, fechaInicioGlobal, fechaFinPlazoGlobal);
+            } else {
+                if (confirm("¿Deseas CERRAR la plaza?")) {
+                    await guardarEstadoPlazaBD(false, fechaInicioGlobal, fechaFinPlazoGlobal);
+                }
+            }
+        };
+
+        window.alCambiarFechaInicio = function() {
+            const nuevaIni = document.getElementById('inputFechaInicioPanel').value;
+            if (nuevaIni) {
+                fechaInicioGlobal = nuevaIni;
+                fechaFinPlazoGlobal = sumarDiasAFecha(nuevaIni, 20);
+                document.getElementById('inputFechaFinPanel').value = fechaFinPlazoGlobal;
+            }
+        };
+
+        window.alCambiarFechaFin = function() {
+            const nuevaFin = document.getElementById('inputFechaFinPanel').value;
+            const fecha20Sugerida = sumarDiasAFecha(fechaInicioGlobal, 20);
+            if (nuevaFin !== fecha20Sugerida) {
+                if (confirm(`ℹ️ Recordatorio de Sistema:\n\nLa referencia automática por defecto es de 20 DÍAS (hasta el ${formatearFechaEsp(fecha20Sugerida)}).\n\n¿Quieres fijar manualmente Cierre al ${formatearFechaEsp(nuevaFin)}?`)) {
+                    fechaFinPlazoGlobal = nuevaFin;
+                } else {
+                    document.getElementById('inputFechaFinPanel').value = fecha20Sugerida;
+                    fechaFinPlazoGlobal = fecha20Sugerida;
+                }
+            } else { fechaFinPlazoGlobal = nuevaFin; }
+        };
+
+        window.guardarFechasPanel = async function() {
+            if (!esAdmin) return;
+            const estadoFinal = (fechaFinPlazoGlobal && obtenerHoyISO() > fechaFinPlazoGlobal) ? false : plazaAbierta;
+            await guardarEstadoPlazaBD(estadoFinal, fechaInicioGlobal, fechaFinPlazoGlobal);
+            alert(`Fechas de plaza guardadas:\n- Inicio: ${formatearFechaEsp(fechaInicioGlobal)}\n- Cierre: ${formatearFechaEsp(fechaFinPlazoGlobal)}`);
+        };
+
+        async function guardarEstadoPlazaBD(estado, fechaIni, fechaFin) {
+            try {
+                await setDoc(doc(db, "configuracion", "estado_plaza"), { 
+                    abierta: estado, fechaInicio: fechaIni, fechaFinPlazo: fechaFin 
                 });
-            } catch (e) {
-                alert("Error al completar: " + e.message);
-            }
+            } catch (e) { console.error(e); }
+        }
+
+        window.modoVistaPublica = function() {
+            esAdmin = false;
+            sessionStorage.removeItem('is_dj_admin');
+            actualizarInterfaz();
+            renderizarListas();
         };
 
-        window.eliminarSolicitud = async function(id) {
-            if (!confirm("¿Seguro que quieres eliminar esta solicitud permanentemente?")) return;
+        function actualizarInterfaz() {
+            const badge = document.getElementById('statusBadge');
+            const formContainer = document.getElementById('formPaso1Container');
+            const alertClosed = document.getElementById('alertClosed');
+            const adminPanel = document.getElementById('adminPanel');
+            const adminBadge = document.getElementById('adminBadge');
+            const btnVolverAdmin = document.getElementById('btnVolverAdmin');
+
+            if (esAdmin) {
+                adminPanel.classList.remove('hidden');
+                adminBadge.classList.remove('hidden');
+                btnVolverAdmin.classList.add('hidden');
+                document.getElementById('inputFechaInicioPanel').value = fechaInicioGlobal || obtenerHoyISO();
+                document.getElementById('inputFechaFinPanel').value = fechaFinPlazoGlobal || sumarDiasAFecha(fechaInicioGlobal, 20);
+            } else {
+                adminPanel.classList.add('hidden');
+                adminBadge.classList.add('hidden');
+                btnVolverAdmin.classList.remove('hidden');
+            }
+
+            const fechaFinMostrar = fechaFinPlazoGlobal || sumarDiasAFecha(fechaInicioGlobal, 20);
+            document.getElementById('textoDiasPlazoPaso1').innerHTML = `<i class="fa-solid fa-calendar-days mr-2"></i>Fecha Límite: ${formatearFechaEsp(fechaFinMostrar)}`;
+
+            const estaAbiertaReal = plazaAbierta && (!fechaFinPlazoGlobal || obtenerHoyISO() <= fechaFinPlazoGlobal);
+
+            if (estaAbiertaReal) {
+                badge.className = "bg-green-500/20 text-green-400 border border-green-500/40 px-4 py-1.5 rounded-full font-bold text-xs inline-flex items-center gap-2";
+                badge.innerHTML = `<span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> PLAZA ABIERTA`;
+                formContainer.classList.remove('hidden');
+                alertClosed.classList.add('hidden');
+            } else {
+                badge.className = "bg-red-500/20 text-red-400 border border-red-500/40 px-4 py-1.5 rounded-full font-bold text-xs inline-flex items-center gap-2";
+                badge.innerHTML = `<span class="w-2 h-2 bg-red-500 rounded-full"></span> PLAZA CERRADA`;
+                formContainer.classList.add('hidden');
+                alertClosed.classList.remove('hidden');
+            }
+        }
+
+        window.evaluarOtrosOption = function(selectId, inputContainerId) {
+            const selectVal = document.getElementById(selectId).value;
+            const container = document.getElementById(inputContainerId);
+            if (selectVal === 'Otros') container.classList.remove('hidden');
+            else container.classList.add('hidden');
+        };
+
+        window.iniciarEnvio = function(e) {
+            e.preventDefault();
+            if(!plazaAbierta) return;
+
+            const timerOverlay = document.getElementById('timerOverlay');
+            const timerNum = document.getElementById('timerNum');
+            timerOverlay.classList.remove('hidden');
+            timerOverlay.classList.add('flex');
+
+            let segundos = 3;
+            timerNum.innerText = segundos;
+
+            const intervalo = setInterval(() => {
+                segundos--;
+                if(segundos > 0) {
+                    timerNum.innerText = segundos;
+                } else {
+                    clearInterval(intervalo);
+                    timerOverlay.classList.remove('flex');
+                    timerOverlay.classList.add('hidden');
+                    document.getElementById('modalPlantilla').classList.remove('hidden');
+                    document.getElementById('modalPlantilla').classList.add('flex');
+                }
+            }, 1000);
+        };
+
+        window.guardarTodo = async function(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btnFinal');
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Guardando...';
+            btn.disabled = true;
+
+            const hoyFormatted = new Date().toISOString().split('T')[0];
+            const fechaFinFinal = fechaFinPlazoGlobal || sumarDiasAFecha(fechaInicioGlobal, 20);
+
+            let tonoFinal = document.getElementById('tonoMensaje').value;
+            if (tonoFinal === 'Otros') tonoFinal = document.getElementById('inputTonoOtro').value || 'Otros';
+
+            let estiloFinal = document.getElementById('estiloMusica').value;
+            if (estiloFinal === 'Otros') estiloFinal = document.getElementById('inputEstiloOtro').value || 'Otros';
+
             try {
-                await deleteDoc(doc(db, "solicitudes_musica", id));
-            } catch (e) {
-                alert("Error al eliminar: " + e.message);
+                await addDoc(collection(db, "solicitudes_musica"), {
+                    clientId: clientId,
+                    perfil: document.getElementById('perfil').value,
+                    nombre: document.getElementById('nombre').value,
+                    fechaInicio: hoyFormatted,
+                    fechaFin: fechaFinFinal,
+                    edadCumple: document.getElementById('edadCumple').value,
+                    relacion: document.getElementById('relacion').value,
+                    personalidad: document.getElementById('personalidad').value,
+                    gustos: document.getElementById('gustos').value,
+                    fraseTipica: document.getElementById('fraseTipica').value,
+                    anecdota: document.getElementById('anecdota').value,
+                    queLeHaceEspecial: document.getElementById('queLeHaceEspecial').value,
+                    tonoMensaje: tonoFinal,
+                    estiloMusica: estiloFinal,
+                    enProceso: false,
+                    vista: false,
+                    completada: false,
+                    downloadUrl: "",
+                    creado: Date.now()
+                });
+
+                alert("¡Petición enviada con éxito!");
+                document.getElementById('modalPlantilla').classList.add('hidden');
+                document.getElementById('musicFormPaso1').reset();
+                btn.disabled = false;
+                btn.innerText = "Confirmar y Enviar Solicitud";
+            } catch (err) {
+                console.error("Error guardando:", err);
+                alert("Error al guardar la solicitud.");
+                btn.disabled = false;
+                btn.innerText = "Confirmar y Enviar Solicitud";
             }
         };
-
-        actualizarVistaAdmin();
     </script>
+</head>
+<body class="bg-slate-900 text-white min-h-screen p-4 md:p-8 font-sans relative pb-20">
+
+    <div id="adminBadge" class="hidden fixed top-3 right-3 bg-amber-500/20 border border-amber-500/50 text-amber-300 px-3 py-1.5 rounded-full text-xs font-bold shadow-lg flex items-center gap-1.5 z-30">
+        <i class="fa-solid fa-crown text-amber-400 animate-bounce"></i> Modo Administrador Activo
+    </div>
+
+    <button id="btnVolverAdmin" type="button" onclick="abrirModalAdmin()" class="fixed top-3 right-3 bg-slate-800/90 border border-amber-500/40 text-amber-400 px-3 py-1.5 rounded-full text-xs font-bold shadow-lg flex items-center gap-1.5 z-30 hover:bg-slate-700 transition">
+        <i class="fa-solid fa-crown"></i> Acceso Admin
+    </button>
+
+    <div class="max-w-5xl mx-auto space-y-6">
+        
+        <header class="text-center space-y-3">
+            <h1 class="text-3xl font-bold text-amber-400"><i class="fa-solid fa-music mr-2"></i>Lista Música de IA</h1>
+            
+            <div class="flex items-center justify-center gap-2.5 pt-1 flex-wrap">
+                <a href="https://www.tiktok.com/@djspumout?_r=1&_t=ZN-9AdBdXYWWDm" target="_blank" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-1.5 rounded-full text-xs font-semibold transition flex items-center gap-2 shadow hover:border-amber-400">
+                    <i class="fa-brands fa-tiktok text-amber-400"></i> Mi TikTok
+                </a>
+                <a href="https://about.me/djespuma_preseta_a_su_informacio" target="_blank" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-1.5 rounded-full text-xs font-semibold transition flex items-center gap-2 shadow hover:border-amber-400">
+                    <i class="fa-solid fa-user text-amber-400"></i> Mi Información (about.me)
+                </a>
+                <button type="button" onclick="document.getElementById('modalInfoSpumout').classList.remove('hidden')" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-1.5 rounded-full text-xs font-semibold transition flex items-center gap-2 shadow hover:border-amber-400">
+                    <i class="fa-solid fa-circle-info text-amber-400"></i> Sobre DJ Spumout
+                </button>
+            </div>
+
+            <div id="statusBadge" class="bg-slate-800 border border-slate-700 px-4 py-2 rounded-full text-xs inline-block mt-2">
+                Cargando estado...
+            </div>
+
+            <div id="adminPanel" class="hidden bg-slate-800/90 border border-amber-500/40 p-4 rounded-xl space-y-4 shadow-inner mt-2">
+                <div class="flex items-center justify-between border-b border-slate-700/60 pb-2">
+                    <span class="text-xs text-amber-400 font-bold flex items-center gap-1"><i class="fa-solid fa-crown"></i> Panel DJ Spumout</span>
+                    <button type="button" onclick="modoVistaPublica()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs px-2.5 py-1 rounded transition">
+                        <i class="fa-solid fa-eye mr-1"></i>Ver Vista Público
+                    </button>
+                </div>
+                
+                <div class="flex flex-col md:flex-row items-center justify-between gap-3">
+                    <div class="flex gap-2 w-full md:w-auto">
+                        <button type="button" onclick="cambiarEstadoPlaza(true)" class="flex-1 md:flex-initial bg-green-600 hover:bg-green-500 text-white text-xs font-bold px-3 py-2 rounded-lg transition flex items-center justify-center gap-1">
+                            <i class="fa-solid fa-lock-open"></i> Abrir Plaza
+                        </button>
+                        <button type="button" onclick="cambiarEstadoPlaza(false)" class="flex-1 md:flex-initial bg-red-600 hover:bg-red-500 text-white text-xs font-bold px-3 py-2 rounded-lg transition flex items-center justify-center gap-1">
+                            <i class="fa-solid fa-lock"></i> Cerrar Plaza
+                        </button>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2 bg-slate-900/90 p-2 rounded-lg border border-slate-700 text-xs w-full md:w-auto justify-center">
+                        <div class="flex items-center gap-1">
+                            <label class="text-slate-400">Inicio:</label>
+                            <input type="date" id="inputFechaInicioPanel" onchange="alCambiarFechaInicio()" class="bg-slate-800 text-white border border-slate-700 rounded p-1 text-xs">
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <label class="text-slate-400">Fin Cierre:</label>
+                            <input type="date" id="inputFechaFinPanel" onchange="alCambiarFechaFin()" class="bg-slate-800 text-white border border-slate-700 rounded p-1 text-xs">
+                        </div>
+                        <button type="button" onclick="guardarFechasPanel()" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-2 py-1 rounded transition ml-1">
+                            Guardar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div id="alertClosed" class="bg-slate-800/80 border border-slate-700 p-6 rounded-xl text-center space-y-2 hidden">
+            <i class="fa-solid fa-lock text-3xl text-red-400 mb-1 block"></i>
+            <h3 class="text-lg font-bold text-slate-200">Plazas actualmente cerradas</h3>
+            <p class="text-xs text-slate-400">Permanece atento al directo de DJ Spumout para saber cuándo abre la próxima plaza.</p>
+        </div>
+
+        <div id="formPaso1Container" class="hidden max-w-xl mx-auto">
+            <form id="musicFormPaso1" onsubmit="iniciarEnvio(event)" class="bg-slate-800 p-6 rounded-xl border border-slate-700 space-y-4 shadow-2xl">
+                <div>
+                    <label class="block text-xs text-slate-300 mb-1">Tu Usuario / Perfil de TikTok *</label>
+                    <input type="text" id="perfil" required placeholder="@tu_usuario" class="w-full bg-slate-900 border border-slate-700 rounded p-3 text-sm text-white focus:outline-none focus:border-amber-400">
+                </div>
+
+                <div>
+                    <label class="block text-xs text-slate-300 mb-1">Nombre / Apodo del destinatario *</label>
+                    <input type="text" id="nombre" required placeholder="Ej: Santi / Tío Juan" class="w-full bg-slate-900 border border-slate-700 rounded p-3 text-sm text-white focus:outline-none focus:border-amber-400">
+                </div>
+
+                <div class="bg-slate-900 p-3 rounded-lg border border-slate-700 text-center">
+                    <p class="text-xs text-slate-400">Plazo asignado automáticamente:</p>
+                    <p id="textoDiasPlazoPaso1" class="text-base font-bold text-amber-400"><i class="fa-solid fa-calendar-days mr-2"></i>Fecha Límite: Carga...</p>
+                </div>
+
+                <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 rounded-lg transition duration-200 shadow-lg text-base">
+                    <i class="fa-solid fa-paper-plane mr-2"></i>Enviar Solicitud
+                </button>
+            </form>
+        </div>
+
+        <!-- 3 LISTAS DE ESTADOS DESTACADOS (En Proceso / Vistas / Completadas) -->
+        <div id="seccionDestacadosTresColumnas" class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 hidden">
+            <!-- 1. EN PROCESO -->
+            <div class="space-y-2 bg-slate-900/40 p-3.5 rounded-xl border border-amber-500/30">
+                <h2 class="text-xs font-bold text-amber-300 flex items-center gap-1.5 border-b border-amber-500/20 pb-2 uppercase tracking-wider">
+                    <i class="fa-solid fa-compact-disc text-amber-400 animate-spin"></i> 🟡 En Proceso Actualmente
+                </h2>
+                <div id="listaEnProceso" class="space-y-3"></div>
+            </div>
+
+            <!-- 2. VISTAS Y ACEPTADAS -->
+            <div class="space-y-2 bg-slate-900/40 p-3.5 rounded-xl border border-sky-500/30">
+                <h2 class="text-xs font-bold text-sky-300 flex items-center gap-1.5 border-b border-sky-500/20 pb-2 uppercase tracking-wider">
+                    <i class="fa-solid fa-circle-check text-sky-400"></i> 👀 Vistas y Aceptadas
+                </h2>
+                <div id="listaVistas" class="space-y-3"></div>
+            </div>
+
+            <!-- 3. CANCIONES COMPLETADAS -->
+            <div class="space-y-2 bg-slate-900/40 p-3.5 rounded-xl border border-green-500/30">
+                <h2 class="text-xs font-bold text-green-300 flex items-center gap-1.5 border-b border-green-500/20 pb-2 uppercase tracking-wider">
+                    <i class="fa-solid fa-circle-play text-green-400"></i> 🎉 Canciones Completadas
+                </h2>
+                <div id="listaCompletadas" class="space-y-3"></div>
+            </div>
+        </div>
+
+        <!-- 4. LISTA GENERAL DE SOLICITUDES EN COLA CON CONTADOR DINÁMICO -->
+        <div class="space-y-3 pt-4">
+            <h2 class="text-lg font-bold text-amber-400 flex items-center gap-2 border-b border-slate-800 pb-2">
+                <i class="fa-solid fa-list-check"></i> Solicitudes en Cola <span id="contadorSolicitudes" class="text-amber-300 font-semibold">(0)</span>
+            </h2>
+            <div id="listaSolicitudesCola" class="space-y-3">
+                <div class="text-center text-slate-500 py-6">Cargando cola de solicitudes...</div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN PRIVADA INDIVIDUAL DEL CLIENTE -->
+        <div id="bloqueClientePrivado" class="space-y-3 pt-6 border-t border-slate-800">
+            <h2 class="text-lg font-bold text-amber-400 flex items-center gap-2 border-b border-slate-800 pb-2">
+                <i class="fa-solid fa-user-gear"></i> Mi Solicitud Privada
+            </h2>
+            <div id="listaMisSolicitudes" class="space-y-3">
+                <div class="text-center text-slate-500 py-6">Cargando tus datos...</div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- MODAL INFORMACIÓN DJ SPUMOUT -->
+    <div id="modalInfoSpumout" onclick="if(event.target === this) this.classList.add('hidden')" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden justify-center items-center z-50 p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-lg w-full space-y-4 shadow-2xl relative my-8">
+            <button type="button" onclick="document.getElementById('modalInfoSpumout').classList.add('hidden')" class="absolute top-3 right-3 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            <div class="text-center space-y-1 border-b border-slate-700 pb-3">
+                <h3 class="text-amber-400 font-bold text-lg flex items-center justify-center gap-2"><i class="fa-solid fa-compact-disc text-amber-400 animate-spin"></i> DJ Spumout</h3>
+                <p class="text-xs text-slate-400">Director en Dos Hermanas, España</p>
+            </div>
+            <div class="text-xs text-slate-300 space-y-3 leading-relaxed max-h-[60vh] overflow-y-auto pr-2">
+                <p>Hola, soy <strong>DJ Spumout</strong>.</p>
+                <p>Soy DJ, técnico de sonido y productor. Mi objetivo es claro: crear momentos únicos, hacer que la gente disfrute y conectar a través de la música.</p>
+                <p>Tengo una discapacidad que hace que a veces me cueste expresarme, pero eso no me define. Al contrario, me ha hecho más fuerte, constante y con más ganas de demostrar todo lo que soy capaz de hacer.</p>
+                <p>Soy un hombre cercano y respetuoso, con valores claros. Me gusta que la gente se sienta cómoda conmigo, confíe y disfrute sin prejuicios. Defiendo el respeto y la igualdad, y pequeños detalles como pintarme las uñas de rosa forman parte de ese mensaje.</p>
+                <p>Me adapto a todo tipo de público y situaciones: eventos, directos, sesiones… siempre dando lo mejor de mí. Amigos, amigas, clientes o seguidores, todos son bienvenidos a disfrutar y compartir conmigo.</p>
+                <p>Además, creo música personalizada para mis seguidores de TikTok, usando su propio nombre con ayuda de IA comercial. Así cada uno puede tener algo único, pensado solo para él o ella.</p>
+                <p>Si buscas a alguien profesional, auténtico y con buena energía, estás en el lugar correcto.</p>
+                <p>Puedes encontrarme en TikTok, Twitch y otras redes sociales, donde también hago directos y comparto mi trabajo.</p>
+                <p class="text-amber-400 font-bold text-center">Gracias por estar aquí 🙌</p>
+            </div>
+            <button type="button" onclick="document.getElementById('modalInfoSpumout').classList.add('hidden')" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-2 rounded text-xs transition">Entendido</button>
+        </div>
+    </div>
+
+    <!-- ACCESO ADMIN -->
+    <button type="button" onclick="abrirModalAdmin()" title="Acceso Admin" class="fixed bottom-3 right-3 bg-slate-800/60 hover:bg-slate-700 text-slate-500 hover:text-amber-400 p-2.5 rounded-full border border-slate-700/50 transition duration-200 text-xs opacity-40 hover:opacity-100 z-30">
+        <i class="fa-solid fa-user-shield"></i>
+    </button>
+
+    <div id="modalLoginAdmin" onclick="if(event.target === this) cerrarModalAdmin()" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden justify-center items-center z-50 p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-xs w-full space-y-4 shadow-2xl relative">
+            <button type="button" onclick="cerrarModalAdmin()" class="absolute top-3 right-3 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            <h3 class="text-amber-400 font-bold text-base flex items-center gap-2"><i class="fa-solid fa-crown"></i> Acceso Admin</h3>
+            <form onsubmit="verificarClaveAdmin(event)" class="space-y-3">
+                <input type="password" id="claveAdminInput" placeholder="Contraseña Admin" required class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-400">
+                <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-2 rounded text-xs transition">Acceder</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- OVERLAY CUENTA ATRÁS -->
+    <div id="timerOverlay" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md hidden justify-center items-center z-50 flex-col space-y-4">
+        <div class="text-amber-400 text-6xl font-extrabold animate-bounce" id="timerNum">3</div>
+        <p class="text-xl font-semibold text-white">Procesando solicitud...</p>
+        <p class="text-sm text-slate-400">Preparando plantilla personalizada...</p>
+    </div>
+
+    <!-- MODAL FORMULARIO FICHA -->
+    <div id="modalPlantilla" onclick="if(event.target === this) document.getElementById('modalPlantilla').classList.add('hidden')" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md hidden justify-center items-center z-40 p-4 overflow-y-auto">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-2xl w-full my-8 space-y-6 shadow-2xl relative">
+            <button type="button" onclick="document.getElementById('modalPlantilla').classList.add('hidden')" class="absolute top-4 right-4 text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            <div class="text-center border-b border-slate-700 pb-4">
+                <h2 class="text-2xl font-bold text-amber-400"><i class="fa-solid fa-sliders mr-2"></i>Personaliza la Canción</h2>
+                <p class="text-xs text-slate-400 mt-1">Rellena esta ficha para que la canción quede perfecta</p>
+            </div>
+            <form onsubmit="guardarTodo(event)" class="space-y-4 text-sm max-h-[70vh] overflow-y-auto pr-2">
+                <div class="space-y-3">
+                    <h3 class="font-bold text-amber-400 flex items-center gap-2"><i class="fa-solid fa-user"></i> 1. Básico</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <input type="text" id="edadCumple" placeholder="Edad o cumpleaños (Ej: 25 años)" class="bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                        <input type="text" id="relacion" placeholder="Relación (Hijo, Tío, Amigo...)" class="bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                    </div>
+                </div>
+                <div class="space-y-3 border-t border-slate-700 pt-3">
+                    <h3 class="font-bold text-amber-400 flex items-center gap-2"><i class="fa-solid fa-masks-theater"></i> 2. Personalidad</h3>
+                    <input type="text" id="personalidad" placeholder="¿Cómo es? (Gracioso, trabajador, rebelde...)" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                    <input type="text" id="gustos" placeholder="¿Qué le gusta? (Fútbol, coches, flamenco...)" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                    <input type="text" id="fraseTipica" placeholder="Frase típica que siempre dice..." class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                </div>
+                <div class="space-y-3 border-t border-slate-700 pt-3">
+                    <h3 class="font-bold text-amber-400 flex items-center gap-2"><i class="fa-solid fa-book-bookmark"></i> 3. Recuerdos</h3>
+                    <textarea id="anecdota" placeholder="Anécdota especial con la familia..." class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white" rows="2"></textarea>
+                    <input type="text" id="queLeHaceEspecial" placeholder="¿Qué le hace único / especial?" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                </div>
+                <div class="space-y-3 border-t border-slate-700 pt-3">
+                    <h3 class="font-bold text-amber-400 flex items-center gap-2"><i class="fa-solid fa-heart"></i> 4. Intención y Estilo</h3>
+                    <div>
+                        <select id="tonoMensaje" onchange="evaluarOtrosOption('tonoMensaje', 'containerTonoOtro')" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                            <option value="Emocionar ❤️">Emocionar ❤️</option>
+                            <option value="Divertido 😂">Divertido 😂</option>
+                            <option value="Motivador 💪">Motivador 💪</option>
+                            <option value="Otros">Otros...</option>
+                        </select>
+                        <div id="containerTonoOtro" class="hidden mt-2">
+                            <input type="text" id="inputTonoOtro" placeholder="Escribe la intención o mensaje..." class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                        </div>
+                    </div>
+                    <div>
+                        <select id="estiloMusica" onchange="evaluarOtrosOption('estiloMusica', 'containerEstiloOtro')" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                            <option value="Flamenco Moderno">Flamenco Moderno</option>
+                            <option value="Sevillanas / Rumba Española">Sevillanas / Rumba Española</option>
+                            <option value="Reggaetón">Reggaetón</option>
+                            <option value="Trap / Urbano">Trap / Urbano</option>
+                            <option value="Balada">Balada</option>
+                            <option value="Himno">Tipo "Himno"</option>
+                            <option value="Hardstyle">Hardstyle</option>
+                            <option value="K-pop">K-pop</option>
+                            <option value="Otros">Otros...</option>
+                        </select>
+                        <div id="containerEstiloOtro" class="hidden mt-2">
+                            <input type="text" id="inputEstiloOtro" placeholder="Escribe el estilo musical que quieres..." class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                        </div>
+                    </div>
+                </div>
+                <button id="btnFinal" type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 rounded-lg transition duration-200 mt-4 text-base">
+                    Confirmar y Enviar Solicitud
+                </button>
+            </form>
+        </div>
+    </div>
+
 </body>
 </html>
