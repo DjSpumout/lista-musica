@@ -93,7 +93,6 @@
                 window.solicitudesCache[docItem.id] = data;
                 docs.push({ id: docItem.id, data: data });
             });
-            // Ordenar en cliente de más reciente a más antiguo (los antiguos sin 'creado' van al final sin perderse)
             docs.sort((a, b) => (b.data.creado || 0) - (a.data.creado || 0));
             listaDocumentosActual = docs;
             renderizarListas();
@@ -183,7 +182,6 @@
                 const id = item.id;
                 const data = item.data;
                 
-                // Normalización estricta de estados para soportar registros antiguos y nuevos
                 const enProceso = data.enProceso === true;
                 const completada = data.completada === true;
                 const vista = data.vista === true && !enProceso && !completada;
@@ -290,7 +288,6 @@
                 }
             });
 
-            // Actualizar contador real
             if (contadorContenedor) {
                 contadorContenedor.innerText = `(${totalEnCola})`;
             }
@@ -704,7 +701,7 @@ Plazo de entrega: ${formatearFechaEsp(data.fechaFin)}
                 </div>
 
                 <div>
-                    <label class="block text-xs text-slate-300 mb-1">Nombre / Apodo del destinatario *</label>
+                    <label class="block text-xs text-slate-300 mb-1">A quién se dedica (Nombre / Apodo) *</label>
                     <input type="text" id="nombre" required placeholder="Ej: Santi / Tío Juan" class="w-full bg-slate-900 border border-slate-700 rounded p-3 text-sm text-white focus:outline-none focus:border-amber-400">
                 </div>
 
